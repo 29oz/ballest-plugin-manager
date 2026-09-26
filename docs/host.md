@@ -35,11 +35,13 @@ plugin's GitHub repo and lists the SHA-256 of every file the game downloads:
 ```
 
 - The game reads it from `raw.githubusercontent.com` (this repo's `main` branch) and downloads each file from
-  `raw.githubusercontent.com/<repo>/<commit>/<file>`, with WinHTTP on a worker thread.
+  `raw.githubusercontent.com/<repo>/<commit>/<file>`, with WinHTTP on a worker thread. An entry with a `path`
+  (`"path": "plugins/grind-stats"`, for a repo that holds several plugins) downloads from
+  `<repo>/<commit>/<path>/<file>` instead; `files` stays relative to the plugin's folder either way.
 - Every file is checked against its SHA-256 before anything is written; a mismatch fails the install and leaves the
   plugins folder untouched. Files go to a hidden `plugins\.<id>.download` folder first and are moved into place
   only once all of them are verified.
-- Only plain names are accepted (ids, file names, `owner/repo`), so a registry entry cannot point outside the
+- Only plain names are accepted (ids, file names, `owner/repo`, `path`), so a registry entry cannot point outside the
   plugins folder. Only the plugin manager (an `essential` plugin) can install or remove, and essential plugins cannot
   be removed.
 - To test a registry before publishing, put a `file:///` URL in

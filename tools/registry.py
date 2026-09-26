@@ -1,9 +1,11 @@
 """Maintains registry.json, the list of plugins the game can install.
 
-    python tools/registry.py add <plugin repo folder> <tag> [--repo owner/name]
+    python tools/registry.py add <plugin repo folder> <tag> [--repo owner/name] [--path folder/in/repo]
         Adds or updates the plugin's entry from its repo at that tag: name, version, description and so on from its
         info.toml, the tag's commit, and the SHA-256 of each file the game downloads (info.toml, the script files, the
         icon), hashed exactly as git stores them, which is what raw.githubusercontent.com serves. Push the tag first.
+        For a repo that holds several plugins, --path names the plugin's folder in it (plugins/grind-stats); the tag
+        is then the plugin's id and version (grind-stats-v0.1.0), and the entry needs a host that reads "path".
 
     python tools/registry.py host <tag> <path to version.dll>
         Points the registry's "host" entry at a release of this repo: the tag's commit, the DLL uploaded to that
@@ -30,6 +32,7 @@ ROOT = Path(__file__).resolve().parents[1]
 REGISTRY = ROOT / "registry.json"
 DEFAULT_OWNER = "AnythingGoes-ballest"
 HOST_REPO = f"{DEFAULT_OWNER}/ballest-plugin-manager"
+PATH_MIN_HOST = "0.12.0"        # the first host that reads an entry's "path"
 
 
 def git(repo, *args):
@@ -44,12 +47,27 @@ def save(registry):
     REGISTRY.write_text(json.dumps(registry, indent=2) + "\n", encoding="utf-8", newline="\n")
 
 
-def files_of(manifest, repo, commit):
+def in_repo(path, name):
+    """Where a plugin file is in its repo: under the plugin's folder when it has one."""
+    return f"{path}/{name}" if path else name
+
+
+def version_of(tag):
+    """The version a tag names: v0.1.0, or grind-stats-v0.1.0 for one plugin of several in a repo."""
+    return tag[1:] if tag.startswith("v") else tag.rpartition("-v")[2]
+
+
+def newer(a, b):
+    return tuple(int(n) for n in a.split(".")) > tuple(int(n) for n in b.split("."))
+
+
+def files_of(manifest, repo, commit, path=""):
     """The files the game needs: info.toml, the scripts, the assets ([script] assets, wildcards allowed) and the icon
-    if there is one."""
+    if there is one. Names are relative to the plugin's folder (path)."""
     meta, script = manifest.get("meta", {}), manifest.get("script", {})
     names = ["info.toml", *script.get("files", ["main.as"])]
-    tree = set(git(repo, "ls-tree", "-r", "--name-only", commit).decode().splitlines())
+    listed = git(repo, "ls-tree", "-r", "--name-only", commit, *(["--", path + "/"] if path else [])).decode()
+    tree = {n[len(path) + 1:] if path else n for n in listed.splitlines()}
     for pattern in script.get("assets", []):
         matched = sorted(n for n in tree if fnmatch.fnmatchcase(n, pattern))
         if not matched:
@@ -64,26 +82,32 @@ def files_of(manifest, repo, commit):
     return names, (icon if icon in tree else "")
 
 
-def add(path, tag, repo_name):
+def add(path, tag, repo_name, folder=""):
     repo = Path(path).resolve()
+    folder = folder.strip("/")
     commit = git(repo, "rev-parse", f"{tag}^{{commit}}").decode().strip()
-    manifest = tomllib.loads(git(repo, "show", f"{commit}:info.toml").decode())
+    manifest = tomllib.loads(git(repo, "show", f"{commit}:{in_repo(folder, 'info.toml')}").decode())
     meta = manifest.get("meta", {})
-    if meta.get("version") and tag.lstrip("v") != meta["version"]:
+    if meta.get("version") and version_of(tag) != meta["version"]:
         sys.exit(f"tag {tag} but info.toml says version {meta['version']}")
-    names, icon = files_of(manifest, repo, commit)
+    names, icon = files_of(manifest, repo, commit, folder)
+    default_id = folder.rpartition("/")[2] if folder else repo.name.removeprefix("ballest-").removesuffix("-plugin")
+    min_host = meta.get("min_host", "")
+    if folder and (not min_host or newer(PATH_MIN_HOST, min_host)):
+        min_host = PATH_MIN_HOST        # an older host would download from the repo's root
     entry = {
-        "id": repo.name.removeprefix("ballest-").removesuffix("-plugin") if "id" not in meta else meta["id"],
-        "name": meta.get("name", repo.name),
+        "id": meta.get("id", default_id),
+        "name": meta.get("name", folder.rpartition("/")[2] or repo.name),
         "description": meta.get("description", ""),
         "author": meta.get("author", ""),
         "repo": repo_name or f"{DEFAULT_OWNER}/{repo.name}",
-        "version": meta.get("version", tag.lstrip("v")),
+        **({"path": folder} if folder else {}),
+        "version": meta.get("version", version_of(tag)),
         "commit": commit,
-        "min_host": meta.get("min_host", ""),
+        "min_host": min_host,
         "icon": icon,
         "dependencies": meta.get("dependencies", []),
-        "files": {n: hashlib.sha256(git(repo, "show", f"{commit}:{n}")).hexdigest() for n in names},
+        "files": {n: hashlib.sha256(git(repo, "show", f"{commit}:{in_repo(folder, n)}")).hexdigest() for n in names},
     }
     registry = load()
     plugins = [p for p in registry["plugins"] if p["id"] != entry["id"]]
@@ -126,11 +150,12 @@ def mirror(out, paths, host_test=None, host_dll=None):
         repo = by_folder.get(entry["repo"].split("/")[1])
         if not repo:
             continue
-        target = out / entry["repo"] / entry["commit"]
+        folder = entry.get("path", "")
+        target = out / entry["repo"] / entry["commit"] / folder
         target.mkdir(parents=True, exist_ok=True)
         for name in entry["files"]:
             (target / name).parent.mkdir(parents=True, exist_ok=True)
-            (target / name).write_bytes(git(repo, "show", f"{entry['commit']}:{name}"))
+            (target / name).write_bytes(git(repo, "show", f"{entry['commit']}:{in_repo(folder, name)}"))
     local = dict(registry, raw_base=out.as_uri() + "/")
     if host_test:
         # A pretend newer host: the DLL given, and the bundled plugins as committed at HEAD.
@@ -156,6 +181,7 @@ def main():
     a.add_argument("path")
     a.add_argument("tag")
     a.add_argument("--repo", help="owner/name on GitHub (default: %s/<folder name>)" % DEFAULT_OWNER)
+    a.add_argument("--path", dest="folder", default="", help="the plugin's folder in the repo, for a repo with several plugins")
     h = sub.add_parser("host")
     h.add_argument("tag")
     h.add_argument("dll")
@@ -166,7 +192,7 @@ def main():
     m.add_argument("--host-dll", help="the DLL that update installs")
     args = ap.parse_args()
     if args.command == "add":
-        add(args.path, args.tag, args.repo)
+        add(args.path, args.tag, args.repo, args.folder)
     elif args.command == "host":
         host(args.tag, args.dll)
     else:
