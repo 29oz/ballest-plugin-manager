@@ -50,7 +50,7 @@ line, or `# `, starts a comment. Lengths are in cm and the ball's radius is 50. 
 
 ```
 material <name> plastic|metal|glow #rrggbb [rough=0.5] [bright=5]
-material <name> glass [#rrggbb] [opacity=0.2] [rough=0.05]
+material <name> glass [#rrggbb] [opacity=0.2]
 tempo [rate=1] [run=0] [max=] [calm=1] [full=1]
 group <name> [spin=x|y|z] [speed=<degrees a second>] [travel] [on=<group>] [pivot=x,y,z]
       [swing=x|y|z angle=<degrees>] [bob=<cm>] [phase=<degrees>]
@@ -73,7 +73,9 @@ group <name> [spin=x|y|z] [speed=<degrees a second>] [travel] [on=<group>] [pivo
 
 - **Materials** come first. `plastic` and `metal` are solid colours (`rough` from 0, shiny, to 1, matte); `glow`
   lights up (`bright`); `glass` is the game's see-through glass, tinted with the colour (clear if none is given),
-  `opacity` from 0 (invisible) to 1. Colours show as given: the game's own rim tint and concrete grain are turned
+  `opacity` from 0 (invisible) to 1. Clear glass shows in front of the stadium water like everything else. Tinted
+  glass can't: the game has no tintable glass that sorts with its water, so the water behind a tinted part is drawn
+  over it. Keep tinted glass low on a ball, where the track is usually behind it. Colours show as given: the game's own rim tint and concrete grain are turned
   off.
 - **Groups** collect the parts after them. `spin` turns the group about an axis; `travel` keeps it level and turned
   the way the ball is going instead of rolling with the ball (a blade that stays upright, for example). Before the

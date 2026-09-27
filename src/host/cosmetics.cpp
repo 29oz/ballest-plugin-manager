@@ -24,9 +24,10 @@ const wchar_t* kWhite = L"/Engine/EngineResources/WhiteSquareTexture.WhiteSquare
 const wchar_t* kFlatNormal = L"/Engine/EngineMaterials/BaseFlattenNormalMap.BaseFlattenNormalMap";
 const wchar_t* kGhostHatSource = L"/Game/Art/DataAssets/Accessories/PartyHat/DA_Accessory_PartyHat.DA_Accessory_PartyHat";
 const wchar_t* kSphereMesh = L"/Engine/BasicShapes/Sphere.Sphere";
-// The game's glass (translucent; ColorGlass, Opacity, Roughness read from the package), for clear balls.
-const wchar_t* kGlassMaterial = L"/Game/Art/Materials/Masters/M_Glass.M_Glass";
-constexpr float kClearBallOpacity = 0.12f;
+// The game's glass, V2 (translucent; ColorGlass and Opacity, read from the package), for clear balls. Drawn in the same
+// translucency pass as the stadium water, so the two sort by distance (M_Glass's earlier pass put water over it).
+const wchar_t* kGlassMaterial = L"/Game/Art/Materials/Masters/M_GlassV2.M_GlassV2";
+constexpr float kClearBallOpacity = 0.07f;    // V2 darkens more than M_Glass: 0.12 looked smoky (measured)
 
 const char* const kAssetClass[3] = {"PDA_BallSkin_C", "PDA_Accessory_C", "PDA_GoalExplo_C"};
 const char* const kToSave[3] = {"SkinToSave", "AccessoryToSave", "GoalExploToSave"};    // the page's pending choice
@@ -783,7 +784,6 @@ bool AddBall(const std::string& id, const std::string& name, const std::wstring&
         KeepAlive(material);
         SetVector(material, "ColorGlass", 1, 1, 1, 1);
         SetScalar(material, "Opacity", kClearBallOpacity);
-        SetScalar(material, "Roughness", 0.05f);
         Obj asset = Create(Kind::Ball, id, name, Texture(preview));
         if (!asset) return false;
         SetObject(asset, "SkinMaterial", material);

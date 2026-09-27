@@ -23,9 +23,14 @@ constexpr double kPi = 3.14159265358979323846;
 // its emissive light (Light_Color, Light_Emissive_Intensity).
 const wchar_t* kColourMaterial = L"/Game/Art/Materials/Instances/Ball/MI_BallRed.MI_BallRed";
 const wchar_t* kGlowMaterial = L"/Game/Art/Materials/Environment/Materials/Instances/MI_Env_Emissive_Yellow.MI_Env_Emissive_Yellow";
-// The game's glass (the see-through replay camera uses it too; read from the package: translucent, with parameters
-// ColorGlass, Opacity, Roughness, Specular and Refraction).
-const wchar_t* kGlassMaterial = L"/Game/Art/Materials/Masters/M_Glass.M_Glass";
+// Glass. The stadium water (M_Water_Base) draws in the default translucency pass; M_Glass in the one before depth of
+// field, so water behind it is drawn over it (reported: a clear ball vanished in front of water). Clear glass is
+// M_GlassV2, which is in the default pass with the water, so the two sort by distance. V2 can't be tinted (its
+// ColorGlass changes nothing, measured), and neither can any other glass of the game in that pass (measured:
+// M_GlassStylized, M_DiscCheckpointGlass, the snow globe's), so tinted glass stays M_Glass (read from the package:
+// ColorGlass, Opacity, Refraction), drawn behind water that is behind it.
+const wchar_t* kClearGlassMaterial = L"/Game/Art/Materials/Masters/M_GlassV2.M_GlassV2";
+const wchar_t* kTintedGlassMaterial = L"/Game/Art/Materials/Masters/M_Glass.M_Glass";
 
 struct Vec3 {
     double x, y, z;
@@ -105,6 +110,7 @@ bool Parse(const std::string& text, Model* model, std::string* error) {
                 m.name = w[1];
                 m.finish = Finish::Glass;
                 if (w.size() >= 4 && w[3].size() == 7 && w[3][0] == '#') {
+                    m.tinted = true;
                     const long rgb = std::strtol(w[3].c_str() + 1, nullptr, 16);
                     m.r = Linear((rgb >> 16) & 255);
                     m.g = Linear((rgb >> 8) & 255);
@@ -447,7 +453,9 @@ bool Append(Obj mesh, const Part& part) {
 }
 
 Obj MakeMaterial(const Material& m, Obj worldContext) {
-    const wchar_t* path = m.finish == Finish::Glow ? kGlowMaterial : m.finish == Finish::Glass ? kGlassMaterial : kColourMaterial;
+    const wchar_t* path = m.finish == Finish::Glow    ? kGlowMaterial
+                          : m.finish == Finish::Glass ? (m.tinted ? kTintedGlassMaterial : kClearGlassMaterial)
+                                                      : kColourMaterial;
     Obj parent = cosmetics::LoadAsset(path);
     if (!parent) return nullptr;
     const Params made = eng::Call(Lib("KismetMaterialLibrary"), "CreateDynamicMaterialInstance", worldContext, parent,
@@ -476,8 +484,10 @@ Obj MakeMaterial(const Material& m, Obj worldContext) {
     if (m.finish == Finish::Glass) {
         vector("ColorGlass", m.r, m.g, m.b);
         scalar("Opacity", m.opacity);
-        scalar("Roughness", m.rough);
-        scalar("Refraction", 1);            // no bending: the game's own amount drew a glass bowl dark grey (measured)
+        if (m.tinted) {
+            scalar("Roughness", m.rough);
+            scalar("Refraction", 1);        // no bending: M_Glass's own amount drew a glass bowl dark grey (measured)
+        }
     } else if (m.finish == Finish::Glow) {
         vector("Light_Color", m.r, m.g, m.b);
         scalar("Light_Emissive_Intensity", m.bright);

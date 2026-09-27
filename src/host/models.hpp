@@ -5,7 +5,7 @@
 // The text, one statement a line ("#" at the start of a line, or "# ", starts a comment; lengths in cm, the ball's
 // radius is 50; angles in degrees):
 //   material <name> plastic|metal|glow #rrggbb [rough=0.5] [bright=5]
-//   material <name> glass [#rrggbb] [opacity=0.2] [rough=0.05]   (the game's M_Glass: see-through, tinted)
+//   material <name> glass [#rrggbb] [opacity=0.2]   (see-through: clear M_GlassV2, or tinted M_Glass)
 //   group <name> [spin=x|y|z] [speed=<degrees a second>] [travel] [on=<group>] [pivot=x,y,z]
 //         [swing=x|y|z angle=<degrees> [phase=<degrees>]] [bob=<cm> [phase=<degrees>]]
 //       parts after it belong to it; "travel" keeps the group upright and turned to where the ball is going instead
@@ -38,6 +38,7 @@ struct Material {
     float r = 1, g = 1, b = 1;          // linear
     float rough = 0.5f, bright = 5;
     float opacity = 0.2f;               // glass
+    bool tinted = false;                // glass: given a colour
 };
 
 enum class Shape { Sphere, Box, Cylinder, Cone, Capsule, Disc, Ring, Saw, Cup, Bowl, Spiral };
