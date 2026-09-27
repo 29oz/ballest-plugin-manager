@@ -129,6 +129,27 @@
       }
     },
     {
+      "id": "practice-checkpoints",
+      "name": "Practice Checkpoints",
+      "description": "Place your own checkpoints anywhere on a track, cycle through them and jump back to practice a section.",
+      "author": "Pedro",
+      "repo": "Pedro-Brito-09/ballest-plugins",
+      "path": "plugins/practice-checkpoints",
+      "version": "0.3.0",
+      "commit": "70b302d004d909a6f46d99346994555cb96dfd3c",
+      "min_host": "0.12.0",
+      "icon": "icon.png",
+      "dependencies": [],
+      "files": {
+        "info.toml": "805ad28cfc1869c60a17eda8381ea0418ee5a143f304fd0f32a616d36f683007",
+        "main.as": "2ddba9f3cec5318170a24523c948552ca44033c42e18989e1b0640ef6e954cf0",
+        "markers.txt": "369f09cc4d969672fa07ce494b5077df2a0bb3cb2f0f77cc5e90fe3c07e8d34c",
+        "legit.png": "7fc215cdfd88b8c6d7e420ffaf23e959600a199e4904fa07a792b505d2ad8b4f",
+        "practice.png": "42263fa09f3269a4b4b421c39ac002250063fab122903361033d0c792b978757",
+        "icon.png": "faf3c280589c0ea2d2819835655134bc2214ba7054ac4d59d4c7b680523a3c1e"
+      }
+    },
+    {
       "id": "replay-manager",
       "name": "Replay Manager",
       "description": "Pause, speed (.1x to 5x), scrubbing, default / follow 3D / free cameras, camera distance, and seeing through objects.",
