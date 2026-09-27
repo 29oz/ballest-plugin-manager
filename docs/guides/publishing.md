@@ -28,7 +28,8 @@ the plugin manager (see [info.toml](../reference/manifest.md)).
 
 ## 2. Tag a version
 
-The tag is the version number with a `v`, and must match `version` in `info.toml`:
+The tag is the version number with a `v`, and must match `version` in `info.toml`. A tag is all that's needed; you
+don't have to make a GitHub release:
 
 ```
 git tag v0.1.0
@@ -70,8 +71,36 @@ registry entry's `min_host` asks for by itself.
 
 ## Updates
 
-Make your changes, raise `version` in `info.toml`, tag the new version, and ask again. Players who have the plugin see
-**update** in the browser.
+An update works like the first version: a new tag, then a request. You don't need to make a GitHub release; the tag is
+all the registry uses.
+
+1. Make your changes and raise `version` in `info.toml`.
+2. Commit and push, then tag that commit with the new version and push the tag:
+
+    ```
+    git tag v0.2.0
+    git push origin v0.2.0
+    ```
+
+    In a repo with several plugins the tag starts with the plugin's id, as before: `grind-stats-v0.2.0`.
+
+3. Open an issue with the new tag (and the plugin's folder, for a shared repo). The maintainer reviews what changed
+   since the last version and adds it the same way:
+
+    ```
+    python tools/registry.py add ../your-plugin-repo v0.2.0
+    ```
+
+Pushing new commits or a new tag doesn't reach players by itself: the registry keeps pointing at the reviewed commit
+until the new version is added.
+
+Once it's added, players who have the plugin see **update** on its card in the browser. The new version is downloaded
+and checked in full before it replaces the old one, so a failed download leaves the old version working. Files the
+new version no longer lists are removed. What the plugin saved with `Storage` and its settings are kept, since they're
+stored outside the plugin's folder.
+
+Never move a tag or reuse a version number you've already published: the registry holds that commit's file hashes,
+and installs of that version would fail the check. Fix mistakes with a new version instead.
 
 ## Before you publish
 
