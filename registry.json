@@ -90,15 +90,15 @@
       "description": "AiAi, MeeMee, Baby and GonGon from Super Monkey Ball (GameCube) running inside their balls: clear glass with a coloured lower half.",
       "author": "AnythingGoes",
       "repo": "AnythingGoes-ballest/ballest-monkey-balls",
-      "version": "0.1.0",
-      "commit": "ef120dd7bb141133be4668f3d1bcd545c97c1434",
-      "min_host": "0.12.0",
+      "version": "0.1.1",
+      "commit": "d48693828fbc28df532175e7ea83091cd7b4a9a4",
+      "min_host": "0.13.1",
       "icon": "icon.png",
       "dependencies": [
         "cosmetic-kit"
       ],
       "files": {
-        "info.toml": "aaa1a1a08a04d47e002f3a4260fa4c9fc58c65fe521e6b4063a360be84f213a3",
+        "info.toml": "5784261f87691dfc8e9dd2fc54f30a32a19b4b1400228741d89d2f507ee9a575",
         "main.as": "06734ea8408bc05fcf9cf83c6c3fc7863a032041e0f8e97d90374f1bf8c39b46",
         "aiai_preview.png": "92b719f2f7402e5dc33b6b0a06334e22f5fe93010280d3a2310466593dad3c36",
         "baby_preview.png": "021d6b64cb3bd158d9e5439969dbe3de20a8a2b103549bf7426382ef7e167529",
@@ -168,11 +168,11 @@
     }
   ],
   "host": {
-    "version": "0.13.0",
+    "version": "0.13.1",
     "repo": "AnythingGoes-ballest/ballest-plugin-manager",
-    "commit": "f6cd48f00e3de991f2fb8e878a9fcb4b1caa016f",
-    "dll": "https://github.com/AnythingGoes-ballest/ballest-plugin-manager/releases/download/v0.13.0/version.dll",
-    "dll_sha256": "d67dded9e074abb487f09cbc136c863e0503d451845b40c4b7a4febc1ecc928c",
+    "commit": "2972ca2dbe46d309903c8762905f19991e676b9a",
+    "dll": "https://github.com/AnythingGoes-ballest/ballest-plugin-manager/releases/download/v0.13.1/version.dll",
+    "dll_sha256": "82d659ac6d7ca8df71843153addeb43969232d8a8e29c8140d22c20402367b00",
     "files": {
       "plugins/hello-world/info.toml": "5300e78277bc1e92d4d1626ce17ed15e938f37e692b2271b58c3c9c30b79be40",
       "plugins/hello-world/main.as": "24f510821cb3ea7825bfef6363d92e12fd493b9977038beb9e6c297a692fb23b",
