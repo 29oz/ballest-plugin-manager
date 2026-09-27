@@ -47,6 +47,27 @@ python tools/registry.py add ../your-plugin-repo v0.1.0
 That records the tag's commit and every file's hash in `registry.json`. Once it's pushed, the plugin shows up in
 everyone's browser the next time the registry loads.
 
+## Several plugins in one repo
+
+A repo can also hold several plugins, each in its own folder with the same files as above:
+
+```
+plugins/
+  grind-stats/     info.toml  main.as  icon.png  README.md
+  other-plugin/    ...
+LICENSE
+```
+
+Each plugin is versioned on its own, so its tags start with its id: `grind-stats-v0.1.0`. In the issue, give the
+plugin's folder as well as the repo and the tag. It's added with `--path`:
+
+```
+python tools/registry.py add ../your-plugins-repo grind-stats-v0.1.0 --repo you/your-plugins-repo --path plugins/grind-stats
+```
+
+The plugin's id is its folder's name. Plugins in a shared repo need plugin manager 0.12.0 or later, which the
+registry entry's `min_host` asks for by itself.
+
 ## Updates
 
 Make your changes, raise `version` in `info.toml`, tag the new version, and ask again. Players who have the plugin see

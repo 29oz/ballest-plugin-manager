@@ -7,6 +7,10 @@
 //                    "repo": "owner/name", "version": "0.1.0", "commit": "<sha>", "min_host": "0.3.0",
 //                    "icon": "icon.png", "files": { "info.toml": "<sha256>", "main.as": "<sha256>", ... } } ] }
 //
+// "path" (optional) is the plugin's folder inside its repo, for a repo that holds several plugins:
+// "path": "plugins/grind-stats". Files are downloaded from <repo>/<commit>/<path>/<file>; `files` stays relative to
+// the plugin's folder, and is installed the same way either way.
+//
 // Where it is read from: %LOCALAPPDATA%\Ballest\Saved\PluginManager\registry_url.txt if that file exists (a URL,
 // https:// or file:///), otherwise kDefaultUrl.
 #pragma once
@@ -19,12 +23,14 @@ namespace registry {
 constexpr const char* kDefaultUrl = "https://raw.githubusercontent.com/AnythingGoes-ballest/ballest-plugin-manager/main/registry.json";
 
 struct Entry {
-    std::string id, name, description, author, repo, version, commit, minHost;
+    std::string id, name, description, author, repo, path, version, commit, minHost;
     std::vector<std::string> dependencies;                  // ids installed before it
     std::string iconFile;                                   // one of `files`, or ""
     std::vector<std::pair<std::string, std::string>> files; // name, sha256
     std::string icon;                                       // local copy of the icon once downloaded, or ""
-    std::string Page() const { return "https://github.com/" + repo; }
+    std::string Page() const {
+        return "https://github.com/" + repo + (path.empty() ? "" : "/tree/" + commit + "/" + path);
+    }
 };
 
 void Frame();                       // game thread, before plugins run

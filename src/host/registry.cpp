@@ -135,7 +135,9 @@ bool WriteAll(const std::wstring& path, const std::string& data) {
     return static_cast<bool>(f);
 }
 
-std::string FileUrl(const Entry& e, const std::string& file) { return gRawBase + e.repo + "/" + e.commit + "/" + file; }
+std::string FileUrl(const Entry& e, const std::string& file) {
+    return gRawBase + e.repo + "/" + e.commit + "/" + (e.path.empty() ? "" : e.path + "/") + file;
+}
 
 std::string Sha(const Entry& e, const std::string& file) {
     for (const auto& [name, sha] : e.files)
@@ -161,6 +163,7 @@ bool ReadEntry(const json::Value& v, Entry& e, std::string& why) {
     e.description = v.Str("description");
     e.author = v.Str("author");
     e.repo = v.Str("repo");
+    e.path = v.Str("path");
     e.version = v.Str("version", "0.0.0");
     e.commit = v.Str("commit");
     e.minHost = v.Str("min_host");
@@ -170,6 +173,7 @@ bool ReadEntry(const json::Value& v, Entry& e, std::string& why) {
             if (d.type == json::Value::String && ValidId(d.string)) e.dependencies.push_back(d.string);
     if (!ValidId(e.id)) return why = "bad id '" + e.id + "'", false;
     if (!ValidRepo(e.repo)) return why = e.id + ": bad repo", false;
+    if (!e.path.empty() && !ValidPluginFile(e.path)) return why = e.id + ": bad path", false;
     if (!Hex(e.commit, 40, 40)) return why = e.id + ": commit must be a full SHA", false;
     const json::Value* files = v.Get("files");
     if (!files || files->type != json::Value::Object || files->members.empty()) return why = e.id + ": no files", false;
