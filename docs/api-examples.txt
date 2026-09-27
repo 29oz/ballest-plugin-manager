@@ -1498,7 +1498,7 @@ Adds a ball. `AddBall(id, name, image, preview, model)`:
 |---|---|
 | `id` | A unique key for this ball, never shown to players. What the player wears is remembered by it, so keep it the same across versions. Start it with your plugin's id and a dot so no two plugins pick the same one: `"my-balls.planet"`. |
 | `name` | The ball's name, shown in the game: `"planet"`. |
-| `image` | The ball's texture: the full path of a PNG in your plugin's folder, twice as wide as it is tall (1024x512). Left to right goes once around the ball, top to bottom from pole to pole. Or `""` for a clear ball (the game's snow globe glass), to show a `model` inside it. |
+| `image` | The ball's texture: the full path of a PNG in your plugin's folder, twice as wide as it is tall (1024x512). Left to right goes once around the ball, top to bottom from pole to pole. Or `""` for a clear glass ball, to show a `model` inside it. |
 | `preview` | The picture on its tile on the Customize page (a PNG in your folder), or `""` to show the texture. |
 | `model` | Optional: a [model file](../../guides/cosmetics.md#models) of 3D parts built around the ball and rolling with it (raised details, lights, a spinning blade), or `""` for none. |
 

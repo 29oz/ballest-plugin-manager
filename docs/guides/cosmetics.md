@@ -38,7 +38,9 @@ A ball's texture wraps around the ball: left to right goes once around, top to b
 twice as wide as it is tall (1024x512). Something drawn flat is stretched near the poles, so draw it the way it should
 look on the ball: Example Cosmetics' `make_images.py` projects its smiley and samples its textures on the sphere.
 
-With no image (`""`) the ball is clear, made of the game's snow globe glass, so a model can sit inside it.
+With no image (`""`) the ball is clear glass, so a model can sit inside it. A `bowl` of tinted glass in the model makes
+half of the ball coloured, like the balls in Super Monkey Ball.
+[Monkey Balls](https://github.com/AnythingGoes-ballest/ballest-monkey-balls) puts a running monkey in each.
 
 ## Models
 
@@ -48,7 +50,7 @@ line, or `# `, starts a comment. Lengths are in cm and the ball's radius is 50. 
 
 ```
 material <name> plastic|metal|glow #rrggbb [rough=0.5] [bright=5]
-material <name> glass [rim=1] [highlight=1]
+material <name> glass [#rrggbb] [opacity=0.2] [rough=0.05]
 tempo [rate=1] [run=0] [max=] [calm=1] [full=1]
 group <name> [spin=x|y|z] [speed=<degrees a second>] [travel] [on=<group>] [pivot=x,y,z]
       [swing=x|y|z angle=<degrees>] [bob=<cm>] [phase=<degrees>]
@@ -66,10 +68,13 @@ group <name> [spin=x|y|z] [speed=<degrees a second>] [travel] [on=<group>] [pivo
 | `ring` | `r=` `thick=` `degrees=` | centred, flat around z (`degrees` for an arc, such as a handle) |
 | `saw` | `r=` `teeth=` `depth=` `thick=` | centred, flat |
 | `cup` | `r=` `top=` `h=` `wall=` | standing: a bowl open at the top |
+| `bowl` | `r=` `wall=` | centred: the lower half of a sphere's shell, open at the top |
+| `spiral` | `r=` `inner=` `turns=` `thick=` | centred, flat: a tube coiled from radius `r` in to `inner` |
 
 - **Materials** come first. `plastic` and `metal` are solid colours (`rough` from 0, shiny, to 1, matte); `glow`
-  lights up (`bright`); `glass` is the game's see-through snow globe glass, with its rim and highlight made stronger
-  or weaker (`rim`, `highlight`: 1 is the game's own).
+  lights up (`bright`); `glass` is the game's see-through glass, tinted with the colour (clear if none is given),
+  `opacity` from 0 (invisible) to 1. Colours show as given: the game's own rim tint and concrete grain are turned
+  off.
 - **Groups** collect the parts after them. `spin` turns the group about an axis; `travel` keeps it level and turned
   the way the ball is going instead of rolling with the ball (a blade that stays upright, for example). Before the
   ball has moved, a travelling group faces away from the camera, and on the Customize page it faces the camera.

@@ -23,9 +23,9 @@ constexpr double kPi = 3.14159265358979323846;
 // its emissive light (Light_Color, Light_Emissive_Intensity).
 const wchar_t* kColourMaterial = L"/Game/Art/Materials/Instances/Ball/MI_BallRed.MI_BallRed";
 const wchar_t* kGlowMaterial = L"/Game/Art/Materials/Environment/Materials/Instances/MI_Env_Emissive_Yellow.MI_Env_Emissive_Yellow";
-// The snow globe skin's glass (BP_SnowGlobeSkin's Sphere wears it; read from the package: translucent, with scalar
-// parameters RimStrength, RimExp, HighlightStrength, HighlightExp, GhostOpacity and Vel).
-const wchar_t* kGlassMaterial = L"/Game/Art/Materials/Masters/M_SnowGlobeTop.M_SnowGlobeTop";
+// The game's glass (the see-through replay camera uses it too; read from the package: translucent, with parameters
+// ColorGlass, Opacity, Roughness, Specular and Refraction).
+const wchar_t* kGlassMaterial = L"/Game/Art/Materials/Masters/M_Glass.M_Glass";
 
 struct Vec3 {
     double x, y, z;
@@ -104,8 +104,15 @@ bool Parse(const std::string& text, Model* model, std::string* error) {
                 Material m;
                 m.name = w[1];
                 m.finish = Finish::Glass;
-                m.rim = static_cast<float>(num("rim", 1));
-                m.highlight = static_cast<float>(num("highlight", 1));
+                if (w.size() >= 4 && w[3].size() == 7 && w[3][0] == '#') {
+                    const long rgb = std::strtol(w[3].c_str() + 1, nullptr, 16);
+                    m.r = Linear((rgb >> 16) & 255);
+                    m.g = Linear((rgb >> 8) & 255);
+                    m.b = Linear(rgb & 255);
+                }
+                m.opacity = static_cast<float>(num("opacity", 0.2));
+                m.rough = static_cast<float>(num("rough", 0.05));
+                if (m.opacity < 0 || m.opacity > 1) return fail("glass: opacity from 0 to 1");
                 model->materials.push_back(m);
                 continue;
             }
@@ -166,7 +173,7 @@ bool Parse(const std::string& text, Model* model, std::string* error) {
         static const std::pair<const char*, Shape> shapes[] = {
             {"sphere", Shape::Sphere}, {"box", Shape::Box},   {"cylinder", Shape::Cylinder}, {"cone", Shape::Cone},
             {"capsule", Shape::Capsule}, {"disc", Shape::Disc}, {"ring", Shape::Ring},       {"saw", Shape::Saw},
-            {"cup", Shape::Cup}};
+            {"cup", Shape::Cup},       {"bowl", Shape::Bowl},   {"spiral", Shape::Spiral}};
         Part p{};
         bool known = false;
         for (const auto& [name, shape] : shapes)
@@ -189,7 +196,9 @@ bool Parse(const std::string& text, Model* model, std::string* error) {
         p.degrees = num("degrees", 360);
         p.teeth = static_cast<int>(num("teeth", 0));
         if (p.shape == Shape::Capsule) p.h = num("len", 0);
-        if (p.shape == Shape::Cup) p.thick = num("wall", 0);
+        if (p.shape == Shape::Cup || p.shape == Shape::Bowl) p.thick = num("wall", 0);
+        p.inner = num("inner", 0);
+        p.turns = num("turns", 0);
         std::string v;
         if (value("size", &v) && !Numbers(v, p.size, 3)) return fail("size=x,y,z");
         if (value("at", &v) && !Numbers(v, p.at, 3)) return fail("at=x,y,z");
@@ -199,6 +208,8 @@ bool Parse(const std::string& text, Model* model, std::string* error) {
                         : p.shape == Shape::Ring     ? p.r > 0 && p.thick > 0
                         : p.shape == Shape::Saw      ? p.r > 0 && p.teeth >= 3 && p.thick > 0 && p.depth > 0 && p.depth < p.r
                         : p.shape == Shape::Cup      ? p.r > 0 && p.h > 0 && p.thick > 0 && p.thick < p.r
+                        : p.shape == Shape::Bowl     ? p.r > 0 && p.thick > 0 && p.thick < p.r
+                        : p.shape == Shape::Spiral   ? p.r > 0 && p.inner >= 0 && p.inner < p.r && p.turns > 0 && p.thick > 0
                         : p.shape == Shape::Cylinder || p.shape == Shape::Capsule ? p.r > 0 && p.h > 0
                         : p.shape == Shape::Cone     ? (p.r > 0 || p.top > 0) && p.h > 0
                                                      : p.r > 0;
@@ -247,7 +258,52 @@ ArrayHeader Points(const std::vector<std::pair<double, double>>& points) {
     return a;
 }
 
+bool Append(Obj mesh, const Part& part);
+
+// A spiral: short capsules end to end along a flat coil around z (in the part's own space), from radius r in to
+// radius inner over `turns` turns, each placed with the part's transform.
+bool AppendSpiral(Obj mesh, const Part& part) {
+    const int steps = std::max(8, static_cast<int>(part.turns * 28));
+    auto point = [&](int i) {
+        const double t = static_cast<double>(i) / steps, a = 2 * kPi * part.turns * t, rad = part.r + (part.inner - part.r) * t;
+        return Vec3{rad * std::cos(a), rad * std::sin(a), 0};
+    };
+    Obj math = Lib("KismetMathLibrary");
+    const Transform whole = MakeTransform(part.at, part.rot, part.scale);
+    bool ok = true;
+    for (int i = 0; i < steps; ++i) {
+        const Vec3 a = point(i), b = point(i + 1);
+        const Vec3 d{b.x - a.x, b.y - a.y, b.z - a.z};
+        const double length = std::sqrt(d.x * d.x + d.y * d.y + d.z * d.z);
+        const Rot along = eng::Call(math, "MakeRotFromZ", d).ReturnAs<Rot>();
+        // The capsule stands on its base: start it half a thickness back so the pieces overlap into one tube.
+        const double r = part.thick / 2;
+        const Vec3 start{a.x - d.x / length * r, a.y - d.y / length * r, a.z};
+        const double at[3] = {start.x, start.y, start.z}, rot[3] = {along.pitch, along.yaw, along.roll}, one[3] = {1, 1, 1};
+        const Transform local = MakeTransform(at, rot, one);
+        const Params composed = eng::Call(math, "ComposeTransforms", local, whole);
+        Transform t{};
+        if (const uint8_t* bytes = composed.Return()) std::memcpy(t.bytes, bytes, sizeof t.bytes);
+        Obj lib = Lib("GeometryScriptLibrary_MeshPrimitiveFunctions");
+        Params p(eng::FindFunction(eng::ClassOf(lib), "AppendCapsule"));
+        Options options;
+        options.materialId = part.material;
+        p.Set("TargetMesh", mesh);
+        p.Set("PrimitiveOptions", options);
+        p.Set("Transform", t);
+        p.Set("Radius", static_cast<float>(r));
+        p.Set("LineLength", static_cast<float>(length));
+        p.Set("HemisphereSteps", int32_t{3});
+        p.Set("CircleSteps", int32_t{10});
+        p.Set("SegmentSteps", int32_t{1});
+        p.Set("Origin", uint8_t{1});
+        ok &= eng::Invoke(lib, p);
+    }
+    return ok;
+}
+
 bool Append(Obj mesh, const Part& part) {
+    if (part.shape == Shape::Spiral) return AppendSpiral(mesh, part);
     Obj lib = Lib("GeometryScriptLibrary_MeshPrimitiveFunctions");
     Options options;
     options.materialId = part.material;
@@ -261,7 +317,9 @@ bool Append(Obj mesh, const Part& part) {
         case Shape::Capsule: fn = "AppendCapsule"; break;
         case Shape::Disc: fn = "AppendDisc"; break;
         case Shape::Ring:
-        case Shape::Cup: fn = "AppendRevolvePolygon"; break;
+        case Shape::Cup:
+        case Shape::Bowl: fn = "AppendRevolvePolygon"; break;
+        case Shape::Spiral: return false;
         case Shape::Saw: fn = "AppendSimpleExtrudePolygon"; break;
     }
     Params p(eng::FindFunction(eng::ClassOf(lib), fn));
@@ -345,6 +403,29 @@ bool Append(Obj mesh, const Part& part) {
             p.Set("Steps", int32_t{40});
             break;
         }
+        case Shape::Bowl: {
+            // The shell's cross-section (distance from the axis, height): a quarter circle out from the bottom to the
+            // rim at the centre's height, and back in along the inside, swept all the way round.
+            std::vector<std::pair<double, double>> section;
+            const int n = 12;
+            for (int i = 0; i <= n; ++i) {
+                const double a = kPi / 2 * i / n;
+                section.push_back({part.r * std::sin(a), -part.r * std::cos(a)});
+            }
+            const double in = part.r - part.thick;
+            for (int i = n; i >= 0; --i) {
+                const double a = kPi / 2 * i / n;
+                section.push_back({in * std::sin(a), -in * std::cos(a)});
+            }
+            const ArrayHeader points = Points(section);
+            RevolveOptions revolve;
+            p.Set("PolygonVertices", points);
+            p.Set("RevolveOptions", revolve);
+            p.Set("Radius", 0.0f);
+            p.Set("Steps", int32_t{48});
+            break;
+        }
+        case Shape::Spiral: break;
         case Shape::Saw: {
             std::vector<std::pair<double, double>> star;
             for (int i = 0; i < part.teeth; ++i) {
@@ -373,10 +454,6 @@ Obj MakeMaterial(const Material& m, Obj worldContext) {
                                   std::array<uint8_t, 8>{}, uint8_t{0});
     Obj mid = made.ReturnObj();
     if (!mid) return nullptr;
-    if (m.finish == Finish::Glass) {
-        cosmetics::ScaleGlass(mid, m.rim, m.highlight);
-        return mid;
-    }
     auto vector = [&](const char* name, float r, float g, float b) {
         Params p(eng::FunctionOn(mid, "SetVectorParameterValue"));
         const std::wstring wide = eng::Widen(name);
@@ -396,13 +473,23 @@ Obj MakeMaterial(const Material& m, Obj worldContext) {
         p.Set("Value", v);
         eng::Invoke(mid, p);
     };
-    if (m.finish == Finish::Glow) {
+    if (m.finish == Finish::Glass) {
+        vector("ColorGlass", m.r, m.g, m.b);
+        scalar("Opacity", m.opacity);
+        scalar("Roughness", m.rough);
+        scalar("Refraction", 1);            // no bending: the game's own amount drew a glass bowl dark grey (measured)
+    } else if (m.finish == Finish::Glow) {
         vector("Light_Color", m.r, m.g, m.b);
         scalar("Light_Emissive_Intensity", m.bright);
     } else {
         vector("BaseColor", m.r, m.g, m.b);
         scalar("Metallic", m.finish == Finish::Metal ? 1.0f : 0.0f);
         scalar("Roughness", m.rough);
+        // MI_BallRed's master (M_ArenaColorBase, read from the package) mixes a concrete texture into the colour
+        // (ConcreteValue, 0.05 on MI_BallRed) and adds a pale rim colour (FresnelColorMult) that turned orange to
+        // yellow and peach to grey on the menu ball (measured): both off, so a part is the colour it was given.
+        scalar("ConcreteValue", 0);
+        scalar("FresnelColorMult", 0);
     }
     return mid;
 }

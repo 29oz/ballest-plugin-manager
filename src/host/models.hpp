@@ -5,7 +5,7 @@
 // The text, one statement a line ("#" at the start of a line, or "# ", starts a comment; lengths in cm, the ball's
 // radius is 50; angles in degrees):
 //   material <name> plastic|metal|glow #rrggbb [rough=0.5] [bright=5]
-//   material <name> glass [rim=1] [highlight=1]    (the game's snow globe glass: see-through)
+//   material <name> glass [#rrggbb] [opacity=0.2] [rough=0.05]   (the game's M_Glass: see-through, tinted)
 //   group <name> [spin=x|y|z] [speed=<degrees a second>] [travel] [on=<group>] [pivot=x,y,z]
 //         [swing=x|y|z angle=<degrees> [phase=<degrees>]] [bob=<cm> [phase=<degrees>]]
 //       parts after it belong to it; "travel" keeps the group upright and turned to where the ball is going instead
@@ -17,7 +17,10 @@
 //   <shape> <material> <size...> [at=x,y,z] [rot=pitch,yaw,roll] [scale=x,y,z]
 //     sphere r=               box size=x,y,z            cylinder r= h=        cone r= top= h=
 //     capsule r= len=         disc r= [hole=]           ring r= thick= [degrees=360]
-//     saw r= teeth= depth= thick=       cup r= top= h= wall=
+//     saw r= teeth= depth= thick=       cup r= top= h= wall=      bowl r= wall=
+//     spiral r= inner= turns= thick=
+//   A bowl is the lower half of a sphere's shell, centred on "at" (open at the top); a spiral is a tube coiled flat
+//   around z from radius r in to radius inner.
 //   Spheres, boxes, discs, rings and saws are centred on "at"; cylinders, cones, capsules and cups stand on it (along
 //   +z). Rings and saws lie flat (around z).
 #pragma once
@@ -34,14 +37,14 @@ struct Material {
     Finish finish = Finish::Plastic;
     float r = 1, g = 1, b = 1;          // linear
     float rough = 0.5f, bright = 5;
-    float rim = 1, highlight = 1;       // glass
+    float opacity = 0.2f;               // glass
 };
 
-enum class Shape { Sphere, Box, Cylinder, Cone, Capsule, Disc, Ring, Saw, Cup };
+enum class Shape { Sphere, Box, Cylinder, Cone, Capsule, Disc, Ring, Saw, Cup, Bowl, Spiral };
 struct Part {
     Shape shape;
     int material = 0;
-    double r = 0, h = 0, top = 0, thick = 0, depth = 0, hole = 0, degrees = 360, size[3] = {0, 0, 0};
+    double r = 0, h = 0, top = 0, thick = 0, depth = 0, hole = 0, degrees = 360, inner = 0, turns = 0, size[3] = {0, 0, 0};
     int teeth = 0;
     double at[3] = {0, 0, 0}, rot[3] = {0, 0, 0}, scale[3] = {1, 1, 1};
 };

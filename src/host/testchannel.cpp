@@ -381,6 +381,10 @@ void Run(const std::string& cmd) {
              Report("cosmetic " + kind + " " + id + (ok ? " -> ok" : " -> failed"));
          }},
         {"cosmetics", [](const Args&, const std::string&) { Report(cosmetics::Status()); }},
+        {"wear", [](const Args& a, const std::string& c) {        // wear ball|hat|bfx <custom id> ("" for the game's own)
+             const cosmetics::Kind kind = Arg(a, 1) == "hat" ? cosmetics::Kind::Hat : Arg(a, 1) == "bfx" ? cosmetics::Kind::Bfx : cosmetics::Kind::Ball;
+             Report(c + (cosmetics::Equip(kind, Arg(a, 2)) ? " -> ok" : " -> failed"));
+         }},
         {"cosmodel", [](const Args& a, const std::string& c) {    // cosmodel ball|hat <id> <model file> [ball image]
              std::string text;
              if (FILE* f = _wfopen(eng::Widen(Arg(a, 3)).c_str(), L"rb")) {

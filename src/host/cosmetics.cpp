@@ -24,8 +24,9 @@ const wchar_t* kWhite = L"/Engine/EngineResources/WhiteSquareTexture.WhiteSquare
 const wchar_t* kFlatNormal = L"/Engine/EngineMaterials/BaseFlattenNormalMap.BaseFlattenNormalMap";
 const wchar_t* kGhostHatSource = L"/Game/Art/DataAssets/Accessories/PartyHat/DA_Accessory_PartyHat.DA_Accessory_PartyHat";
 const wchar_t* kSphereMesh = L"/Engine/BasicShapes/Sphere.Sphere";
-// The snow globe skin's glass (BP_SnowGlobeSkin's Sphere; translucent, read from the package), for clear balls.
-const wchar_t* kGlassMaterial = L"/Game/Art/Materials/Masters/M_SnowGlobeTop.M_SnowGlobeTop";
+// The game's glass (translucent; ColorGlass, Opacity, Roughness read from the package), for clear balls.
+const wchar_t* kGlassMaterial = L"/Game/Art/Materials/Masters/M_Glass.M_Glass";
+constexpr float kClearBallOpacity = 0.12f;
 
 const char* const kAssetClass[3] = {"PDA_BallSkin_C", "PDA_Accessory_C", "PDA_GoalExplo_C"};
 const char* const kToSave[3] = {"SkinToSave", "AccessoryToSave", "GoalExploToSave"};    // the page's pending choice
@@ -780,6 +781,9 @@ bool AddBall(const std::string& id, const std::string& name, const std::wstring&
             return false;
         }
         KeepAlive(material);
+        SetVector(material, "ColorGlass", 1, 1, 1, 1);
+        SetScalar(material, "Opacity", kClearBallOpacity);
+        SetScalar(material, "Roughness", 0.05f);
         Obj asset = Create(Kind::Ball, id, name, Texture(preview));
         if (!asset) return false;
         SetObject(asset, "SkinMaterial", material);
@@ -965,17 +969,6 @@ std::string Status() {
            std::to_string(Count(Kind::Bfx)) + " bfx; worn: ball '" + gEquipped[0] + "', hat '" + gEquipped[1] + "', bfx '" +
            gEquipped[2] + "'; section on tab " + std::to_string(gSectionTab) + "; " + std::to_string(gReplaced.size()) +
            " part(s) replaced";
-}
-
-void ScaleGlass(Obj material, float rim, float highlight) {
-    for (const auto& [parameter, factor] : {std::pair<const char*, float>{"RimStrength", rim}, {"HighlightStrength", highlight}}) {
-        if (factor == 1) continue;
-        Params get(eng::FunctionOn(material, "K2_GetScalarParameterValue"));
-        const Name name = MakeName(parameter);
-        get.Set("ParameterName", name);
-        eng::Invoke(material, get);
-        SetScalar(material, parameter, get.ReturnAs<float>() * factor);
-    }
 }
 
 }  // namespace cosmetics
