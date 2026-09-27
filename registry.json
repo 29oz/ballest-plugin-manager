@@ -85,6 +85,33 @@
       }
     },
     {
+      "id": "monkey-balls",
+      "name": "Monkey Balls",
+      "description": "AiAi, MeeMee, Baby and GonGon from Super Monkey Ball (GameCube) running inside their balls: clear glass with a coloured lower half.",
+      "author": "AnythingGoes",
+      "repo": "AnythingGoes-ballest/ballest-monkey-balls",
+      "version": "0.1.0",
+      "commit": "ef120dd7bb141133be4668f3d1bcd545c97c1434",
+      "min_host": "0.12.0",
+      "icon": "icon.png",
+      "dependencies": [
+        "cosmetic-kit"
+      ],
+      "files": {
+        "info.toml": "aaa1a1a08a04d47e002f3a4260fa4c9fc58c65fe521e6b4063a360be84f213a3",
+        "main.as": "06734ea8408bc05fcf9cf83c6c3fc7863a032041e0f8e97d90374f1bf8c39b46",
+        "aiai_preview.png": "92b719f2f7402e5dc33b6b0a06334e22f5fe93010280d3a2310466593dad3c36",
+        "baby_preview.png": "021d6b64cb3bd158d9e5439969dbe3de20a8a2b103549bf7426382ef7e167529",
+        "gongon_preview.png": "bc471c50a327cd61f4c9069901d829a6ecc318126d0404b9abe4d7557fdda0d6",
+        "icon.png": "92b719f2f7402e5dc33b6b0a06334e22f5fe93010280d3a2310466593dad3c36",
+        "meemee_preview.png": "6fdc2375fd9d04611176fd942c6ca81cea86588b53b950ddb61df3336bf02950",
+        "models/aiai.txt": "4339f46bf73054e603dc051c4ba5defdd859a219f4c30ff4bf0decb3c323a491",
+        "models/baby.txt": "c423820c5845812cb69c3bff025e0f8b25f0262192469d2851e0f2a21fdd3fde",
+        "models/gongon.txt": "53491ff866c775587edae44c869ed0992ff1f6c1f30ade8d0fbe6c9e54f9d7a0",
+        "models/meemee.txt": "f6fe30c42e11df160122cbd97569d182fc1736f8f8789057806d5fe67819bfe1"
+      }
+    },
+    {
       "id": "player-count",
       "name": "Player Count",
       "description": "Inside a map, the leaderboard's title shows how many players have a time on that track.",
@@ -120,11 +147,11 @@
     }
   ],
   "host": {
-    "version": "0.11.0",
+    "version": "0.12.0",
     "repo": "AnythingGoes-ballest/ballest-plugin-manager",
-    "commit": "aeeacc3d6c2bf5501e712886bbc74bace289e41e",
-    "dll": "https://github.com/AnythingGoes-ballest/ballest-plugin-manager/releases/download/v0.11.0/version.dll",
-    "dll_sha256": "63fcfb789998ea0d180741b20440812abfc54bbe5d0b42a92d0814cb5ee759c5",
+    "commit": "551c9b0f2eb87b40496dfdd9e7c324623a687ca4",
+    "dll": "https://github.com/AnythingGoes-ballest/ballest-plugin-manager/releases/download/v0.12.0/version.dll",
+    "dll_sha256": "685054e9ecc8ddbb9b88e847203c6e65f736f69d68b8b597c3905267661dc7eb",
     "files": {
       "plugins/hello-world/info.toml": "5300e78277bc1e92d4d1626ce17ed15e938f37e692b2271b58c3c9c30b79be40",
       "plugins/hello-world/main.as": "24f510821cb3ea7825bfef6363d92e12fd493b9977038beb9e6c297a692fb23b",
