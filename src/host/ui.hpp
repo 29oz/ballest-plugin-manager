@@ -129,6 +129,8 @@ struct Window {
     bool dragging = false;
     double dragMouseX = 0, dragMouseY = 0, dragOffsetX = 0, dragOffsetY = 0;
     float screenWidth = 0, screenHeight = 0;    // fraction of the screen covered, centred; 0 = fit the content
+    float rectWidth = 0, rectHeight = 0;        // SetRect: a fixed size in pixels (0 = fit the content)
+    bool rectPending = false;                   // SetRect on a built window: moved and sized in place, not rebuilt
     float sidebarWidth = 0;                     // 0 = no sidebar
     bool addingToSidebar = false;
     std::vector<int> rowView{0};                // the view each row belongs to; -1 for the header

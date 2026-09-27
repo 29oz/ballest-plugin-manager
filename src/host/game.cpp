@@ -124,4 +124,17 @@ bool OpenLevel(const std::string& map) {
     return eng::Invoke(statics, open);
 }
 
+bool MousePosition(double* x, double* y) {
+    Obj controller = PlayerController();
+    if (!controller) return false;
+    struct Vec2d {
+        double x, y;
+    };
+    const Vec2d mouse = eng::Call(eng::FindCdo("WidgetLayoutLibrary"), "GetMousePositionOnViewport", controller).ReturnAs<Vec2d>(Vec2d{-1, -1});
+    if (mouse.x < 0 || mouse.y < 0) return false;
+    *x = mouse.x;
+    *y = mouse.y;
+    return true;
+}
+
 }  // namespace game

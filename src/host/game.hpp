@@ -20,6 +20,8 @@ double Seconds();                           // real time since the host started
 // own, e.g. when a replay starts). When the last request is released, what the game had is restored.
 void RequestCursor(int owner, bool visible);
 bool CursorShown();                         // the mouse cursor is on screen (menus, pause, a plugin asked)
+// The mouse on the game's viewport, in widget units (those of window offsets), top left 0,0. False if it is off it.
+bool MousePosition(double* x, double* y);
 
 // The text input being typed in, or null. While there is one, input is UI-only with it focused: the game's
 // viewport ignores keys, so the player controller (whose "any key" event moves menu focus) and the pawn never

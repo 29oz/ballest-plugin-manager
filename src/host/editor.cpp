@@ -417,6 +417,45 @@ bool SetRotation(int id, const Rot& rotation) {
     return a && eng::Call(a, "K2_SetActorRotation", rotation, uint8_t{0}).Invoked();
 }
 
+bool ScreenPosition(int id, double* x, double* y) {
+    Obj a = Resolve(id);
+    Obj controller = game::PlayerController();
+    if (!a || !controller) return false;
+    eng::Params bounds(eng::FunctionOn(a, "GetActorBounds"));
+    bounds.Set("bOnlyCollidingComponents", uint8_t{0});
+    bounds.Set("bIncludeFromChildActors", uint8_t{0});
+    eng::Invoke(a, bounds);
+    const uint8_t* origin = bounds.Get("Origin");
+    if (!origin) return false;
+    Vec3 centre{};
+    std::memcpy(&centre, origin, sizeof centre);
+    Obj layout = eng::FindCdo("WidgetLayoutLibrary");
+    eng::Params p(eng::FunctionOn(layout, "ProjectWorldLocationToWidgetPosition"));
+    p.Set("PlayerController", controller);
+    p.Set("WorldLocation", centre);
+    p.Set("bPlayerViewportRelative", uint8_t{0});
+    if (!eng::Invoke(layout, p) || !p.ReturnBool()) return false;
+    struct Vec2d {
+        double x, y;
+    } screen{};
+    const uint8_t* s = p.Get("ScreenPosition");
+    if (!s) return false;
+    std::memcpy(&screen, s, sizeof screen);
+    *x = screen.x;
+    *y = screen.y;
+    return true;
+}
+
+bool SetOutline(int id, bool on) {
+    Obj a = Resolve(id);
+    Obj mesh = a ? eng::ReadObj(a, "Main") : nullptr;
+    if (!mesh) mesh = a ? eng::ReadObj(a, "RootComponent") : nullptr;
+    if (!mesh || !eng::FindFunction(eng::ClassOf(mesh), "SetRenderCustomDepth")) return false;
+    eng::Call(mesh, "SetRenderCustomDepth", static_cast<uint8_t>(on));
+    eng::Call(mesh, "SetCustomDepthStencilValue", int32_t{on ? 1 : 0});
+    return true;
+}
+
 Vec3 ViewForward() {
     Obj controller = game::PlayerController();
     const Rot r = controller ? eng::Call(controller, "GetControlRotation").ReturnAs<Rot>() : Rot{};
@@ -581,6 +620,10 @@ void ClickHooked(Obj context, uint8_t* frame, void* result) {
     for (int id : after)
         if (std::find(before.begin(), before.end(), id) == before.end()) c.piece = id;
     const bool plain = !(c.modifiers & (kClickShift | kClickCtrl | kClickAlt));
+    // A plain press on empty space deselects everything; one that left a selection of several as it was landed on
+    // the gizmo (measured after the 2026-09-25 update, when IsHoveringGizmo answered no even during a drag).
+    if (c.piece < 0 && plain && after.size() > 1 && std::is_permutation(after.begin(), after.end(), before.begin(), before.end()))
+        c.modifiers |= kClickOnGizmo;
     if (c.piece < 0 && plain && after.size() == 1) c.piece = after[0];
     else if (c.piece < 0 && !plain && !(c.modifiers & kClickOnGizmo)) {
         eng::Call(Handler(), "FindAndGrab", uint8_t{0});

@@ -270,6 +270,12 @@ void Build(Window& win) {
         w::StretchOnCanvas(canvas, border, marginX, marginY, 1.0 - marginX, 1.0 - marginY);
     } else {
         win.slot = eng::MakeWeak(w::AddToCanvas(canvas, border, win.anchorX, win.anchorY, {win.pivotX, win.pivotY}, {win.offsetX, win.offsetY}));
+        if (win.rectWidth > 0)
+            if (Obj slot = eng::Get(win.slot)) {
+                eng::Call(slot, "SetAutoSize", uint8_t{0});
+                eng::Call(slot, "SetSize", w::Vec2{win.rectWidth, win.rectHeight});
+            }
+        win.rectPending = false;
     }
     eng::Call(border, "SetBrushColor", win.background);
     const w::Margin padding = sized ? w::Margin{16, 16, 16, 16} : w::Margin{12, 8, 12, 8};
@@ -777,6 +783,12 @@ void Frame() {
             win.shownVisible = win.visible;
         }
         Drag(win);
+        if (win.rectPending)
+            if (Obj slot = eng::Get(win.slot)) {
+                eng::Call(slot, "SetPosition", w::Vec2{win.offsetX + win.hudX, win.offsetY + win.hudY});
+                eng::Call(slot, "SetSize", w::Vec2{win.rectWidth, win.rectHeight});
+                win.rectPending = false;
+            }
         ApplyHud(win);
         if (win.shownView != win.appliedView) {
             for (size_t v = 0; v < win.viewBoxes.size(); ++v)

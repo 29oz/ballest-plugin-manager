@@ -35,6 +35,12 @@ bool Rotation(int id, Rot* out);
 bool SetLocation(int id, const Vec3& location);
 bool SetRotation(int id, const Rot& rotation);
 Vec3 ViewForward();
+// Where a piece's middle (its bounds' centre) is on screen, in the units of window offsets and the mouse position
+// (the viewport's widget units, top left 0,0). False if it isn't in front of the camera.
+bool ScreenPosition(int id, double* x, double* y);
+// The editor's selection outline on a piece, as the game draws it for a selected one (read from BP_BaseItem: its Main
+// mesh renders custom depth with stencil 1), without selecting it. Selecting or deselecting it resets it.
+bool SetOutline(int id, bool on);
 
 // Selects exactly these pieces (the editor's own selection, with its pivot and highlighting).
 void Select(const std::vector<int>& ids);

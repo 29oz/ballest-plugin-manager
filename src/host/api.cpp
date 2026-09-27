@@ -207,6 +207,18 @@ void WinSpace(ui::Window* w, float width) { ui::AddWidget(w, ui::Kind::Space, ""
 void WinNewRow(ui::Window* w) { ui::NewRow(w); }
 void WinStartSidebar(ui::Window* w, float width) { ui::StartSidebar(w, width); }
 void WinStartMain(ui::Window* w) { ui::StartMain(w); }
+// A place and size in pixels from the top left. On a window already on screen it is applied in place (no rebuild),
+// so it can follow the mouse every frame.
+void WinRect(ui::Window* w, float x, float y, float width, float height) {
+    const bool anchored = w->anchorX == 0 && w->anchorY == 0 && w->pivotX == 0 && w->pivotY == 0 && w->rectWidth > 0;
+    w->anchorX = w->anchorY = w->pivotX = w->pivotY = 0;
+    w->offsetX = x;
+    w->offsetY = y;
+    w->rectWidth = std::max(1.0f, width);
+    w->rectHeight = std::max(1.0f, height);
+    if (anchored) w->rectPending = true;
+    else w->layoutDirty = true;
+}
 void WinScreenSize(ui::Window* w, float width, float height) {
     w->screenWidth = width;
     w->screenHeight = height;
@@ -355,6 +367,21 @@ bool EditorRotation(int id, double& pitch, double& yaw, double& roll) {
 }
 bool EditorSetLocation(int id, double x, double y, double z) { return editor::SetLocation(id, {x, y, z}); }
 bool EditorSetRotation(int id, double pitch, double yaw, double roll) { return editor::SetRotation(id, {pitch, yaw, roll}); }
+bool EditorSetOutline(int id, bool on) { return editor::SetOutline(id, on); }
+bool EditorScreenPosition(int id, float& x, float& y) {
+    double sx = 0, sy = 0;
+    const bool ok = editor::ScreenPosition(id, &sx, &sy);
+    x = static_cast<float>(sx);
+    y = static_cast<float>(sy);
+    return ok;
+}
+bool InputMousePosition(float& x, float& y) {
+    double mx = 0, my = 0;
+    const bool ok = game::MousePosition(&mx, &my);
+    x = static_cast<float>(mx);
+    y = static_cast<float>(my);
+    return ok;
+}
 void EditorViewForward(double& x, double& y, double& z) {
     const editor::Vec3 f = editor::ViewForward();
     x = f.x, y = f.y, z = f.z;
@@ -516,6 +543,7 @@ void RegisterUi() {
     Method("Window", "void StartSidebar(float width)", asFUNCTION(WinStartSidebar));
     Method("Window", "void StartMain()", asFUNCTION(WinStartMain));
     Method("Window", "void SetScreenSize(float width, float height)", asFUNCTION(WinScreenSize));
+    Method("Window", "void SetRect(float x, float y, float width, float height)", asFUNCTION(WinRect));
     Method("Window", "int StartView()", asFUNCTION(WinStartView));
     Method("Window", "void SetBlocksClicks(bool)", asFUNCTION(WinBlocksClicks));
     Method("Window", "CheckBox@ AddCheckBox(const string &in label, float size = 16)", asFUNCTION(WinCheckBox));
@@ -617,6 +645,7 @@ void RegisterInput() {
     for (const auto& [name, code] : KeyNames()) Check(e->RegisterEnumValue("Key", name.c_str(), code), name.c_str());
     Global("bool Pressed(Key)", asFUNCTION(KeyPressed));
     Global("bool Down(Key)", asFUNCTION(KeyDown));
+    Global("bool MousePosition(float &out, float &out)", asFUNCTION(InputMousePosition));
     Global("Key AnyPressed()", asFUNCTION(AnyKeyPressed));
     Global("string Name(Key)", asFUNCTION(KeyName));
 }
@@ -722,6 +751,8 @@ void RegisterEditor() {
     Global("bool SetLocation(int, double, double, double)", asFUNCTION(EditorSetLocation));
     Global("bool SetRotation(int, double, double, double)", asFUNCTION(EditorSetRotation));
     Global("void ViewForward(double &out, double &out, double &out)", asFUNCTION(EditorViewForward));
+    Global("bool ScreenPosition(int, float &out, float &out)", asFUNCTION(EditorScreenPosition));
+    Global("bool SetOutline(int, bool)", asFUNCTION(EditorSetOutline));
     Global("void Select(const array<int>@)", asFUNCTION(EditorSelect));
     Global("array<int>@ DuplicateSelection()", asFUNCTION(EditorDuplicate));
     Global("void RotatePieces(const array<int>@, double, double, double, double, double, double)", asFUNCTION(EditorRotatePieces));

@@ -643,6 +643,16 @@ Gives the window a fixed size as fractions of the screen. Without one, the windo
 --
 window.SetScreenSize(0.8f, 0.85f);   // most of the screen, for a menu
 
+== UI::Window.SetRect
+Places the window at `x, y` from the top left of the screen and gives it a fixed size, all in the units of
+`SetOffset` and `Input::MousePosition`. On a window already on screen it moves and resizes it in place, so it can follow
+the mouse every frame. Requires host 0.13.0.
+--
+// a box from where the drag started to the mouse
+float mx, my;
+if (Input::MousePosition(mx, my))
+    box.SetRect(startX, startY, mx - startX, my - startY);
+
 == UI::Window.StartView
 Starts a new view and returns its number. Widgets added afterwards belong to it. Only one view shows at a time,
 chosen with `ShowView`.
@@ -1015,6 +1025,14 @@ A key's name, as its `Input::Key` value is written without `Input::` ("F5", "Pag
 --
 hint.text = "save: " + Input::Name(saveKey);
 
+== Input::MousePosition
+Where the mouse is on the game's screen, from the top left, in the units windows are placed in (`Window.SetOffset`,
+`Window.SetRect`). Returns false when it isn't over the game. Requires host 0.13.0.
+--
+float x, y;
+if (Input::MousePosition(x, y))
+    Log::Info("mouse at " + x + ", " + y);
+
 @@ Race
 The race the player is in.
 
@@ -1269,6 +1287,27 @@ The direction the editor camera is looking, as a unit vector.
 double fx, fy, fz;
 Editor::ViewForward(fx, fy, fz);
 Editor::SetLocation(id, x + fx * 500, y + fy * 500, z + fz * 500);
+
+== Editor::ScreenPosition
+Where a piece's middle (the centre of its bounds) is on screen, in the units of `Input::MousePosition`. Returns false
+when it's behind the camera. Requires host 0.13.0.
+--
+// the pieces whose middle is inside a box on screen
+array<int> inside;
+array<int>@ pieces = Editor::Pieces();
+for (uint i = 0; i < pieces.length(); i++)
+{
+    float x, y;
+    if (Editor::ScreenPosition(pieces[i], x, y) && x >= left && x <= right && y >= top && y <= bottom)
+        inside.insertLast(pieces[i]);
+}
+
+== Editor::SetOutline
+Draws or removes the editor's yellow selection outline on a piece without selecting it, for showing what an action
+will affect. Selecting or deselecting the piece resets it. Returns false if the piece has no mesh to outline.
+Requires host 0.13.0.
+--
+Editor::SetOutline(piece, true);    // about to be selected
 
 == Editor::Select
 Selects exactly these pieces, with the editor's own highlight and gizmo.

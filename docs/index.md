@@ -50,8 +50,8 @@ A folder in the game's `plugins` folder with two files:
   saved totals.
 - [Replay Manager](https://github.com/AnythingGoes-ballest/ballest-replay-manager): replay controls with a slider,
   dropdowns and keyboard input.
-- [Create Extensions](https://github.com/AnythingGoes-ballest/ballest-create-extensions): track editor tools (groups,
-  rotate modes, Shift/Ctrl+click to deselect, rotated copies), a toolbar dropdown and key list rows in the editor's own
+- [Create Extensions](https://github.com/AnythingGoes-ballest/ballest-create-extensions): track editor tools (drag to
+  select, groups, rotate modes, Shift/Ctrl+click to deselect, rotated copies), a toolbar dropdown and key list rows in the editor's own
   style, and a section docked in the editor's details panel.
 - [Cosmetic Kit](https://github.com/AnythingGoes-ballest/ballest-cosmetic-kit) and
   [Example Cosmetics](https://github.com/AnythingGoes-ballest/ballest-example-cosmetics): one plugin offering functions
