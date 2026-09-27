@@ -20,17 +20,17 @@
     {
       "id": "create-extensions",
       "name": "Create Extensions",
-      "description": "Track editor extras: groups (G / U), rotate modes in the toolbar (center, mirrored), Shift/Ctrl+click to deselect, whole-unit placement, placement distance, rotated copies, Tab between transform boxes.",
+      "description": "Track editor extras: drag to select, groups (G / U), rotate modes in the toolbar (center, mirrored), Shift/Ctrl+click to deselect, whole-unit placement, placement distance, rotated copies, Tab between transform boxes.",
       "author": "AnythingGoes",
       "repo": "AnythingGoes-ballest/ballest-create-extensions",
-      "version": "0.3.1",
-      "commit": "e8cc087664c88eb18dc108cef3f43036ec4fc1d3",
-      "min_host": "0.11.0",
+      "version": "0.4.0",
+      "commit": "e80d4b740f99607670483275dc825fa598b2a0c9",
+      "min_host": "0.13.0",
       "icon": "icon.png",
       "dependencies": [],
       "files": {
-        "info.toml": "0eb13c735e0bcc5c0052f979a1a81dc59d81fe9bd92cc18e9a8e9cfa6d9c4484",
-        "main.as": "d571992747ad7d21b9da4e8cf12b6480dbeeeb8dfd154bc2fd63ad8c3676e12c",
+        "info.toml": "63ac4378ee147ba1624c038cbefdfa7a1c0fc43b20a92923cbdee396921be921",
+        "main.as": "fa476c4d25b0c7e554209483e96b2513288b520fc026b3831d7364f3e099c96c",
         "keyboard_g.png": "beaedfc27e44bc1748d8e8d76b7b9f2e6444a323b7a1860a7ae6e727dbe995d0",
         "keyboard_u.png": "a9c0359e7d3764483af43e68584262ed432912e163404bdd3fff78c73b8b380d",
         "icon.png": "673495590b04fbc8b8a75af30e0eed74dc9b34ef11584f3e66fea362e53b74fe"
@@ -147,11 +147,11 @@
     }
   ],
   "host": {
-    "version": "0.12.0",
+    "version": "0.13.0",
     "repo": "AnythingGoes-ballest/ballest-plugin-manager",
-    "commit": "551c9b0f2eb87b40496dfdd9e7c324623a687ca4",
-    "dll": "https://github.com/AnythingGoes-ballest/ballest-plugin-manager/releases/download/v0.12.0/version.dll",
-    "dll_sha256": "685054e9ecc8ddbb9b88e847203c6e65f736f69d68b8b597c3905267661dc7eb",
+    "commit": "f6cd48f00e3de991f2fb8e878a9fcb4b1caa016f",
+    "dll": "https://github.com/AnythingGoes-ballest/ballest-plugin-manager/releases/download/v0.13.0/version.dll",
+    "dll_sha256": "d67dded9e074abb487f09cbc136c863e0503d451845b40c4b7a4febc1ecc928c",
     "files": {
       "plugins/hello-world/info.toml": "5300e78277bc1e92d4d1626ce17ed15e938f37e692b2271b58c3c9c30b79be40",
       "plugins/hello-world/main.as": "24f510821cb3ea7825bfef6363d92e12fd493b9977038beb9e6c297a692fb23b",
