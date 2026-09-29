@@ -43,6 +43,15 @@ Obj Ball() {
     return pawn && eng::FindProp(eng::ClassOf(pawn), "RaceId") ? pawn : nullptr;
 }
 
+// The ball being played: the controlled pawn when it's a ball, else the view target when that is one (in the track
+// editor's test runs the camera follows the ball).
+Obj PlayedBall() {
+    if (Obj b = Ball()) return b;
+    Obj controller = game::PlayerController();
+    Obj target = controller ? eng::Call(controller, "GetViewTarget").ReturnObj() : nullptr;
+    return target && eng::FindProp(eng::ClassOf(target), "RaceId") ? target : nullptr;
+}
+
 Obj Library(const char* name) { return eng::FindCdo(name); }
 
 // An FText property as a string.
@@ -335,6 +344,28 @@ void Frame() {
 bool OnTrack() { return gOnTrack; }
 bool Active() { return gActive; }
 int Restarts() { return gRestarts; }
+
+bool BallPosition(double* x, double* y, double* z) {
+    Obj ball = PlayedBall();
+    if (!ball) return false;
+    const Vec3 at = eng::Call(ball, "K2_GetActorLocation").ReturnAs<Vec3>();
+    *x = at.x;
+    *y = at.y;
+    *z = at.z;
+    return true;
+}
+
+bool EditorTesting() {
+    // The track editor's map with the camera on a ball: a test run (while editing it's on P_LevelEditorPawn_C, and the
+    // editor's ball sits unused, measured).
+    static bool was = false;
+    const bool now = CurrentTrack().key.find("LevelEditor") != std::string::npos && PlayedBall() != nullptr;
+    if (now != was) {
+        was = now;
+        hostlog::Info(std::string("race: editor test run ") + (now ? "started" : "ended"));
+    }
+    return now;
+}
 int RunId() { return gRunId; }
 bool Complete() { return gComplete; }
 const Track& CurrentTrack() { return gTrack; }

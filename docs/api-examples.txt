@@ -1259,6 +1259,14 @@ restarts, gets a new ball or leaves the map.
 --
 Race::StartPractice();
 
+== Race::BallPosition
+Where the ball being played is: in a race, and in the track editor's test runs. False when there's none (the main
+menu, or editing). Requires host 0.15.2.
+--
+double x, y, z;
+if (Race::BallPosition(x, y, z))
+    path.insertLast(x);
+
 == Race::HideBall
 Hides the player's own ball while `true` (with the game's special skin actor and the host's cosmetic models on it), and
 gives it back with `false` or when the plugin stops. For a view of the track without it, such as a ghost viewer.
@@ -1362,6 +1370,13 @@ section.visible = Editor::IsOpen();
 if (!Editor::IsOpen())
     return;
 
+
+== Editor::IsTesting
+Whether a test run of the track being edited is on (the editor's play buttons), as opposed to editing it. Requires
+host 0.15.2.
+--
+if (Editor::IsTesting() && !wasTesting)
+    StartPath();
 == Editor::Selection
 The selected pieces.
 --

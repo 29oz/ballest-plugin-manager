@@ -718,6 +718,7 @@ void RegisterInput() {
 }
 
 std::string RaceTrackKey() { return race::CurrentTrack().key; }
+bool RaceBallPosition(double& x, double& y, double& z) { return race::BallPosition(&x, &y, &z); }
 std::string RaceTrackName() { return race::CurrentTrack().name; }
 std::string RaceTrackAuthor() { return race::CurrentTrack().author; }
 double RaceAuthorTime() { return race::CurrentTrack().authorTime; }
@@ -789,6 +790,7 @@ void RegisterRace() {
     Global("void StartPractice()", asFUNCTION(RaceStartPractice));
     Global("bool IsPractice()", asFUNCTION(race::Practice));
     Global("void HideBall(bool)", asFUNCTION(RaceHideBall));
+    Global("bool BallPosition(double &out, double &out, double &out)", asFUNCTION(RaceBallPosition));
 }
 
 void HudHideGame(bool hidden) { hud::HideGame(plugins::Current(), hidden); }
@@ -816,6 +818,7 @@ void RegisterHud() {
 void RegisterEditor() {
     e->SetDefaultNamespace("Editor");
     Global("bool IsOpen()", asFUNCTION(editor::Open));
+    Global("bool IsTesting()", asFUNCTION(race::EditorTesting));
     Global("array<int>@ Selection()", asFUNCTION(EditorSelection));
     Global("array<int>@ Placed()", asFUNCTION(EditorPlaced));
     Global("bool GetLocation(int, double &out, double &out, double &out)", asFUNCTION(EditorLocation));

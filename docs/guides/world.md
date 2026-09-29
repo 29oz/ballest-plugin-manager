@@ -37,6 +37,9 @@ if (Camera::Project(0, 0, 100, sx, sy))
 
 `Race::HideBall(true)` hides the player's own ball while you show the track.
 
+`Race::BallPosition` says where the ball being played is, in a race or a track editor test run (`Editor::IsTesting`
+says when one is on), for drawing its path as it goes. Both need host 0.15.2.
+
 ## A track's runs
 
 `Ghosts::Load` downloads the top of the leaderboard on screen (and the player's own run) from Steam; `Ghosts::State`

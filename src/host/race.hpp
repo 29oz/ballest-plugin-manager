@@ -17,6 +17,8 @@ void Frame();                   // after game::Frame
 bool OnTrack();                 // a race controller exists (a track is loaded, not the main menu)
 bool Active();                  // a race is running
 int Restarts();                 // restarts from the beginning since the host started
+bool BallPosition(double* x, double* y, double* z);     // the ball being played (also in the editor's test runs)
+bool EditorTesting();           // in the track editor, a test run is on (the camera is on the ball)
 int RunId();                    // the ball's RaceId: a new value for every new run, the same through respawns; -1 off track
 bool Complete();                // the run has been finished (the controller's bRaceComplete)
 // What the player is steering with right now, as the ball reads it (BP_RollingBall_C InputAxes: x right, y forward,
