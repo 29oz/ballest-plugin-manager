@@ -58,7 +58,8 @@ game directly. The API covers:
 - **[Race](reference/api/race.md)**, **[Replay](reference/api/replay.md)** and **[Editor](reference/api/editor.md)**:
   what's happening in the game, and some control over it
 - **[Hud](reference/api/hud.md)**: the race HUD's parts moved, sized and hidden, or the whole race UI hidden
-- **[Cosmetics](reference/api/cosmetics.md)**: custom balls, hats and goal explosions
+- **[Cosmetics](reference/api/cosmetics.md)**: custom balls, hats and goal explosions, with models of simple shapes or
+  3D model files (see [Custom cosmetics](guides/cosmetics.md))
 - **[Draw](reference/api/draw.md)** and **[Camera](reference/api/camera.md)**: shapes in the world, and a camera of
   your own (see [Drawing in the world](guides/world.md))
 - **[Leaderboard](reference/api/leaderboard.md)**, **[Ghosts](reference/api/ghosts.md)** and

@@ -96,7 +96,8 @@ plugin's GitHub repo and lists the SHA-256 of every file the game downloads:
 | `src/host/ghostdata.*` | Replay JSON parsed into samples, looks and splits; positions and checkpoint orders |
 | `src/host/ghosts.*` | Loading a leaderboard's runs (paged, downloaded in parallel, parsed on worker threads), player balls, crowds |
 | `src/host/tracks.*` | The game's tracks and the workshop's, their titles and pictures, and opening them |
-| `src/host/models.*` | Models: shapes described in text, built as Geometry Script dynamic meshes and attached to a ball or hat slot |
+| `src/host/models.*` | Models: shapes described in text, built as Geometry Script dynamic meshes and attached to a ball or hat slot; mesh parts from model files, and their animations as a mesh per frame |
+| `src/host/meshfile.*` | 3D model files (glTF 2.0 and OBJ): read into triangles per material and posed, skinned meshes included. No engine code: `tools/tests/meshfile_test.cpp` checks it offline |
 | `src/host/testchannel.*` | Test and measurement commands, from the console and from the tools below |
 | `src/proxy/` | The `version.dll` export stubs (generated from the system DLL's export table) |
 | `plugins/` | The bundled plugins: Plugin Manager (footer, console, plugin browser) and Hello World (an example) |

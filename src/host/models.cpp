@@ -1,5 +1,7 @@
 #include "models.hpp"
 
+#include <windows.h>
+
 #include <algorithm>
 #include <array>
 #include <cctype>
@@ -13,6 +15,7 @@
 #include "cosmetics.hpp"
 #include "game.hpp"
 #include "log.hpp"
+#include "meshfile.hpp"
 
 namespace models {
 namespace {
@@ -70,9 +73,191 @@ bool Numbers(const std::string& s, double* out, int n) {
     return i == n;
 }
 
+// A rotator's turn applied to a vector, as FRotationMatrix does (the engine's convention, so "rot" means what it means
+// on the other shapes).
+void Turn(const double rot[3], const double in[3], double out[3]) {
+    const double k = kPi / 180, sp = std::sin(rot[0] * k), cp = std::cos(rot[0] * k), sy = std::sin(rot[1] * k),
+                 cy = std::cos(rot[1] * k), sr = std::sin(rot[2] * k), cr = std::cos(rot[2] * k);
+    const double x[3] = {cp * cy, cp * sy, sp};
+    const double y[3] = {sr * sp * cy - cr * sy, sr * sp * sy + cr * cy, -sr * cp};
+    const double z[3] = {-(cr * sp * cy + sr * sy), cy * sr - cr * sp * sy, cr * cp};
+    for (int c = 0; c < 3; ++c) out[c] = in[0] * x[c] + in[1] * y[c] + in[2] * z[c];
+}
+
+// The words after "mesh": the file (in quotes when it has spaces), then key=value options.
+bool MeshWords(const std::string& line, std::string* file, std::vector<std::string>* options) {
+    size_t at = line.find("mesh") + 4;
+    while (at < line.size() && std::isspace(static_cast<unsigned char>(line[at]))) ++at;
+    if (at >= line.size()) return false;
+    size_t end;
+    if (line[at] == '"') {
+        end = line.find('"', at + 1);
+        if (end == std::string::npos) return false;
+        *file = line.substr(at + 1, end - at - 1);
+        ++end;
+    } else {
+        end = at;
+        while (end < line.size() && !std::isspace(static_cast<unsigned char>(line[end]))) ++end;
+        *file = line.substr(at, end - at);
+    }
+    std::stringstream rest(line.substr(end));
+    for (std::string word; rest >> word;) options->push_back(word);
+    return !file->empty();
+}
+
+// A model file read, placed and baked for a mesh part: its materials join the model's.
+bool LoadMesh(const std::string& fileName, const std::vector<std::string>& options, const std::wstring& folder, Model* model, Part* part,
+              std::string* why) {
+    auto option = [&](const char* key, std::string* out) {
+        const std::string prefix = std::string(key) + "=";
+        for (const auto& word : options)
+            if (word.rfind(prefix, 0) == 0) {
+                *out = word.substr(prefix.size());
+                return true;
+            }
+        return false;
+    };
+    auto number = [&](const char* key, double fallback) {
+        std::string v;
+        return option(key, &v) ? std::atof(v.c_str()) : fallback;
+    };
+    std::wstring file = eng::Widen(fileName);
+    for (auto& c : file)
+        if (c == L'/') c = L'\\';
+    if (!(file.size() > 1 && file[1] == L':') && !folder.empty()) file = folder + (folder.back() == L'\\' ? L"" : L"\\") + file;
+    meshfile::Model m;
+    std::string error;
+    if (!m.Load(file, hostlog::DataDir() + L"\\cache\\models", &error)) {
+        *why = fileName + ": " + error;
+        return false;
+    }
+    auto data = std::make_shared<MeshData>();
+    data->file = file;
+    std::string v;
+    double at[3] = {0, 0, 0}, rot[3] = {0, 0, 0}, scale[3] = {1, 1, 1};
+    if (option("at", &v) && !Numbers(v, at, 3)) return *why = "at=x,y,z", false;
+    if (option("rot", &v) && !Numbers(v, rot, 3)) return *why = "rot=pitch,yaw,roll", false;
+    if (option("scale", &v) && !Numbers(v, scale, 3)) return *why = "scale=x,y,z", false;
+    const double size = number("size", 0);
+    const int frames = std::clamp(static_cast<int>(number("frames", 24)), 2, 60);
+    data->rate = number("rate", 1);
+    data->run = number("run", 0);
+    // Materials: the model's own for "material=", else the file's, added to the model's.
+    int forced = -1;
+    if (option("material", &v)) {
+        for (size_t i = 0; i < model->materials.size(); ++i)
+            if (model->materials[i].name == v) forced = static_cast<int>(i);
+        if (forced < 0) return *why = "no material '" + v + "' (define it first)", false;
+    }
+    const int base = static_cast<int>(model->materials.size());
+    if (forced < 0)
+        for (const auto& fm : m.Materials()) {
+            Material mat;
+            mat.name = fileName + "#" + fm.name;
+            mat.r = fm.r, mat.g = fm.g, mat.b = fm.b;
+            mat.rough = fm.rough;
+            const float glow = std::max({fm.er, fm.eg, fm.eb});
+            if (!fm.textureFile.empty() && GetFileAttributesW(fm.textureFile.c_str()) != INVALID_FILE_ATTRIBUTES) {
+                mat.finish = Finish::Image;
+                mat.image = fm.textureFile;
+            } else if (glow > 0.01f) {
+                mat.finish = Finish::Glow;
+                mat.r = fm.er / glow, mat.g = fm.eg / glow, mat.b = fm.eb / glow;
+                mat.bright = 5 * glow;
+            } else if (fm.a < 0.99f) {
+                mat.finish = Finish::Glass;
+                mat.tinted = true;
+                mat.opacity = fm.a;
+            } else {
+                mat.finish = fm.metallic >= 0.5f ? Finish::Metal : Finish::Plastic;
+            }
+            model->materials.push_back(mat);
+        }
+    for (const auto& item : m.Items()) {
+        data->materials.push_back(forced >= 0 ? forced : base + item.material);
+        data->uv.push_back(item.uv);
+        data->indices.push_back(item.indices);
+        data->triangles += item.indices.size() / 3;
+    }
+    // Placed from the rest pose: its longest side "size" cm (as the file has it), then turned by "rot", then moved so
+    // the bottom of its bounds, centred, is on "at".
+    const meshfile::Pose rest = m.At(-1, 0);
+    auto bounds = [](const std::vector<std::vector<float>>& positions, double lo[3], double hi[3]) {
+        for (int c = 0; c < 3; ++c) lo[c] = 1e30, hi[c] = -1e30;
+        for (const auto& p : positions)
+            for (size_t i = 0; i + 2 < p.size(); i += 3)
+                for (int c = 0; c < 3; ++c) {
+                    lo[c] = std::min(lo[c], static_cast<double>(p[i + static_cast<size_t>(c)]));
+                    hi[c] = std::max(hi[c], static_cast<double>(p[i + static_cast<size_t>(c)]));
+                }
+    };
+    double lo[3], hi[3];
+    bounds(rest.positions, lo, hi);
+    const double longest = std::max({hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2], 1e-6});
+    const double k = size > 0 ? size / longest : 1;
+    double offset[3] = {0, 0, 0};
+    auto place = [&](const meshfile::Pose& pose) {
+        Frame f;
+        f.positions.resize(pose.positions.size());
+        f.normals.resize(pose.normals.size());
+        for (size_t it = 0; it < pose.positions.size(); ++it) {
+            const auto& p = pose.positions[it];
+            const auto& n = pose.normals[it];
+            f.positions[it].resize(p.size());
+            f.normals[it].resize(n.size());
+            for (size_t i = 0; i + 2 < p.size(); i += 3) {
+                double local[3], turned[3], nl[3], nt[3];
+                for (int c = 0; c < 3; ++c) {
+                    local[c] = p[i + static_cast<size_t>(c)] * k * scale[c];
+                    nl[c] = n[i + static_cast<size_t>(c)] / (scale[c] != 0 ? scale[c] : 1);
+                }
+                Turn(rot, local, turned);
+                Turn(rot, nl, nt);
+                const double len = std::sqrt(nt[0] * nt[0] + nt[1] * nt[1] + nt[2] * nt[2]);
+                for (int c = 0; c < 3; ++c) {
+                    f.positions[it][i + static_cast<size_t>(c)] = static_cast<float>(turned[c] + offset[c]);
+                    f.normals[it][i + static_cast<size_t>(c)] = static_cast<float>(len > 0 ? nt[c] / len : 0);
+                }
+            }
+        }
+        return f;
+    };
+    data->rest = place(rest);                           // turned about the file's origin, to find where it ends up
+    bounds(data->rest.positions, lo, hi);
+    const double stand[3] = {(lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, lo[2]};
+    for (int c = 0; c < 3; ++c) offset[c] = at[c] - stand[c];
+    data->rest = place(rest);
+    auto bake = [&](const char* key, std::vector<Frame>* out, double* length) {
+        std::string name;
+        if (!option(key, &name)) return true;
+        const int anim = m.FindAnimation(name);
+        if (anim < 0) {
+            std::string list;
+            for (const auto& a : m.Animations()) list += (list.empty() ? "" : ", ") + a;
+            *why = fileName + " has no animation '" + name + "'" + (list.empty() ? " (it has none)" : " (it has: " + list.substr(0, 400) + ")");
+            return false;
+        }
+        *length = m.Length(anim);
+        for (int f = 0; f < frames; ++f) out->push_back(place(m.At(anim, *length * f / frames)));
+        return true;
+    };
+    if (!bake("anim", &data->clip, &data->clipLength) || !bake("idle", &data->idle, &data->idleLength)) return false;
+    if (!data->idle.empty() && data->clip.empty()) {                // an idle only: it plays all the time
+        data->clip = std::move(data->idle);
+        data->clipLength = data->idleLength;
+        data->idle.clear();
+    }
+    part->shape = Shape::Mesh;
+    part->mesh = data;
+    part->material = data->materials.empty() ? 0 : data->materials[0];
+    hostlog::Info("models: " + fileName + ": " + std::to_string(data->triangles) + " triangles, " + std::to_string(m.Materials().size()) +
+                  " material(s)" + (data->clip.empty() ? "" : ", " + std::to_string(data->clip.size() + data->idle.size()) + " frames baked"));
+    return true;
+}
+
 }  // namespace
 
-bool Parse(const std::string& text, Model* model, std::string* error) {
+bool Parse(const std::string& text, Model* model, std::string* error, const std::wstring& folder) {
     *model = Model{};
     Group main;
     main.name = "main";
@@ -177,6 +362,15 @@ bool Parse(const std::string& text, Model* model, std::string* error) {
             g.phase = num("phase", 0);
             if (g.travel && g.Moves()) return fail("a travel group can't pivot, swing or bob: put those on a group on it");
             model->groups.push_back(g);
+            continue;
+        }
+        if (w[0] == "mesh") {
+            std::string fileName, why;
+            std::vector<std::string> options;
+            if (!MeshWords(line, &fileName, &options)) return fail("mesh <file> [options]");
+            Part p{};
+            if (!LoadMesh(fileName, options, folder, model, &p, &why)) return fail(why);
+            model->groups.back().parts.push_back(p);
             continue;
         }
         static const std::pair<const char*, Shape> shapes[] = {
@@ -328,7 +522,8 @@ bool Append(Obj mesh, const Part& part) {
         case Shape::Ring:
         case Shape::Cup:
         case Shape::Bowl: fn = "AppendRevolvePolygon"; break;
-        case Shape::Spiral: return false;
+        case Shape::Spiral:
+        case Shape::Mesh: return false;                 // built from their own buffers (AppendFrame)
         case Shape::Saw: fn = "AppendSimpleExtrudePolygon"; break;
     }
     Params p(eng::FindFunction(eng::ClassOf(lib), fn));
@@ -434,7 +629,8 @@ bool Append(Obj mesh, const Part& part) {
             p.Set("Steps", int32_t{48});
             break;
         }
-        case Shape::Spiral: break;
+        case Shape::Spiral:
+        case Shape::Mesh: break;
         case Shape::Saw: {
             std::vector<std::pair<double, double>> star;
             for (int i = 0; i < part.teeth; ++i) {
@@ -498,7 +694,23 @@ void GlassInWatersPass(Obj glass) {
                   " components redrawn in " + std::to_string(took) + " ms");
 }
 
+// A texture per image file, loaded once for the session (every model built with it shares it).
+Obj ImageTexture(const std::wstring& file) {
+    static std::vector<std::pair<std::wstring, eng::Weak>> loaded;
+    for (const auto& [f, t] : loaded)
+        if (f == file)
+            if (Obj texture = eng::Get(t)) return texture;
+    Obj texture = cosmetics::LoadTexture(file);
+    if (texture) loaded.push_back({file, eng::MakeWeak(texture)});
+    return texture;
+}
+
 Obj MakeMaterial(const Material& m, Obj worldContext) {
+    if (m.finish == Finish::Image) {
+        Obj material = cosmetics::ImageMaterial(ImageTexture(m.image), "ModelImage");
+        if (!material) hostlog::Warn("models: the image of material " + m.name + " did not load");
+        return material;
+    }
     const wchar_t* path = m.finish == Finish::Glow    ? kGlowMaterial
                           : m.finish == Finish::Glass ? (m.tinted ? kTintedGlassMaterial : kClearGlassMaterial)
                                                       : kColourMaterial;
@@ -575,10 +787,108 @@ Obj SpawnMeshActor(Obj worldContext) {
 
 }  // namespace
 
+// Memory from the engine's allocator for the mesh buffers (a padded string donates its buffer, as Points does). Kept
+// and reused: AppendBuffersToMesh only reads them.
+struct EngineBuffer {
+    void* data = nullptr;
+    size_t bytes = 0;
+};
+
+void* Room(EngineBuffer& b, size_t bytes) {
+    if (bytes <= b.bytes) return b.data;
+    const size_t want = std::max(bytes, b.bytes * 2);
+    const std::wstring empty;
+    const eng::FString s{empty.c_str(), 1, 1};
+    const Params p = eng::Call(Lib("KismetStringLibrary"), "LeftPad", s, static_cast<int32_t>(want / 2 + 8));
+    size_t size = 0;
+    const uint8_t* r = p.Return(&size);
+    if (!r || size != 16) return nullptr;
+    void* data = nullptr;
+    std::memcpy(&data, r, sizeof data);
+    if (!data) return nullptr;
+    b.data = data;
+    b.bytes = want;
+    return data;
+}
+
+// FGeometryScriptSimpleMeshBuffers (read from the game's types: 13 arrays, Vertices +0x00, Normals +0x10, UV0 +0x20,
+// VertexColors +0xa0, Triangles +0xb0, TriGroupIDs +0xc0).
+struct MeshBuffers {
+    ArrayHeader arrays[13];
+};
+constexpr int kVertices = 0, kNormals = 1, kUV0 = 2, kTriangles = 11;
+
+// A baked frame's triangles added to a dynamic mesh, each item with its material, moved by -pivot.
+bool AppendFrame(Obj mesh, const MeshData& data, const Frame& frame, const double pivot[3]) {
+    static EngineBuffer vertices, normals, uvs, triangles;
+    Obj lib = Lib("GeometryScriptLibrary_MeshBasicEditFunctions");
+    Obj fn = lib ? eng::FindFunction(eng::ClassOf(lib), "AppendBuffersToMesh") : nullptr;
+    if (!fn) return false;
+    bool ok = true;
+    for (size_t it = 0; it < data.indices.size() && it < frame.positions.size(); ++it) {
+        const auto& pos = frame.positions[it];
+        const auto& nrm = frame.normals[it];
+        const auto& uv = data.uv[it];
+        const auto& idx = data.indices[it];
+        const size_t count = pos.size() / 3, tris = idx.size() / 3;
+        if (count == 0 || tris == 0) continue;
+        auto* v = static_cast<double*>(Room(vertices, count * 24));
+        auto* n = static_cast<double*>(Room(normals, count * 24));
+        auto* t = static_cast<double*>(Room(uvs, count * 16));
+        auto* f = static_cast<int32_t*>(Room(triangles, tris * 12));
+        if (!v || !n || !t || !f) return false;
+        for (size_t i = 0; i < count; ++i) {
+            for (size_t c = 0; c < 3; ++c) {
+                v[i * 3 + c] = pos[i * 3 + c] - pivot[c];
+                n[i * 3 + c] = nrm[i * 3 + c];
+            }
+            t[i * 2] = i * 2 < uv.size() ? uv[i * 2] : 0;
+            t[i * 2 + 1] = i * 2 + 1 < uv.size() ? uv[i * 2 + 1] : 0;
+        }
+        // In the files' own order: with the axes turned into the game's (meshfile.hpp), that is the order that faces
+        // out (measured: reversed, the T-rex drew black, its insides showing).
+        for (size_t k = 0; k < tris; ++k) {
+            f[k * 3] = static_cast<int32_t>(idx[k * 3]);
+            f[k * 3 + 1] = static_cast<int32_t>(idx[k * 3 + 1]);
+            f[k * 3 + 2] = static_cast<int32_t>(idx[k * 3 + 2]);
+        }
+        MeshBuffers b{};
+        b.arrays[kVertices] = {v, static_cast<int32_t>(count), static_cast<int32_t>(count)};
+        b.arrays[kNormals] = {n, static_cast<int32_t>(count), static_cast<int32_t>(count)};
+        b.arrays[kUV0] = {t, static_cast<int32_t>(count), static_cast<int32_t>(count)};
+        b.arrays[kTriangles] = {f, static_cast<int32_t>(tris), static_cast<int32_t>(tris)};
+        Params p(fn);
+        p.Set("TargetMesh", mesh);
+        p.Set("Buffers", b);
+        p.Set("MaterialID", static_cast<int32_t>(data.materials[it]));
+        p.Set("bDeferChangeNotifications", uint8_t{0});
+        // The list of the new triangles' ids is a shared array the call makes and nothing here frees. Given back to
+        // every call, it is refilled rather than made again, so there is one for the session.
+        static std::vector<uint8_t> indexList;
+        const int32_t listSize = p.SizeOf("NewTriangleIndicesList");
+        if (listSize > 0 && indexList.size() == static_cast<size_t>(listSize)) p.Set("NewTriangleIndicesList", indexList.data(), indexList.size());
+        ok &= eng::Invoke(lib, p);
+        size_t got = 0;
+        if (const uint8_t* list = p.Get("NewTriangleIndicesList", &got); list && got >= 16) {
+            static bool checked = false;
+            if (!checked && !indexList.empty()) {
+                checked = true;
+                const bool same = std::memcmp(indexList.data() + 8, list + 8, 8) == 0;
+                hostlog::Info(std::string("models: the mesh buffers' index list is ") + (same ? "reused" : "made again") + " by each call");
+            }
+            indexList.assign(list, list + got);
+        }
+    }
+    return ok;
+}
+
 bool Built::Alive() const {
     if (!eng::Get(parent)) return false;
     for (const auto& a : actors)
         if (!eng::Get(a)) return false;
+    for (const auto& f : flips)
+        for (const auto& a : f.frames)
+            if (!eng::Get(a)) return false;
     return !actors.empty();
 }
 
@@ -600,6 +910,10 @@ Built Build(const Model& model, Obj parent) {
             return built;
         }
         for (Part part : group.parts) {                               // built about the group's pivot
+            if (part.shape == Shape::Mesh) {
+                if (part.mesh && part.mesh->clip.empty()) AppendFrame(mesh, *part.mesh, part.mesh->rest, group.pivot);
+                continue;
+            }
             for (int k = 0; k < 3; ++k) part.at[k] -= group.pivot[k];
             Append(mesh, part);
         }
@@ -616,8 +930,45 @@ Built Build(const Model& model, Obj parent) {
         if (on) eng::Call(actor, "K2_AttachToComponent", on, std::array<uint8_t, 8>{}, snap, snap, snap, uint8_t{0});
         if (group.travel) eng::Call(component, "SetAbsolute", uint8_t{0}, uint8_t{1}, uint8_t{0});
         built.actors.push_back(eng::MakeWeak(actor));
+        // Animated mesh parts: a mesh per frame, on the group, only the one shown visible.
+        for (const Part& part : group.parts) {
+            if (part.shape != Shape::Mesh || !part.mesh || part.mesh->clip.empty()) continue;
+            Built::Flip flip;
+            flip.group = built.actors.size() - 1;
+            flip.mesh = part.mesh;
+            const auto started = std::chrono::steady_clock::now();
+            for (int set = 0; set < 2; ++set)
+                for (const Frame& frame : set == 0 ? part.mesh->clip : part.mesh->idle) {
+                    Obj frameActor = SpawnMeshActor(controller);
+                    Obj frameComponent = frameActor ? eng::ReadObj(frameActor, "DynamicMeshComponent") : nullptr;
+                    Obj frameMesh = frameComponent ? eng::Call(frameComponent, "GetDynamicMesh").ReturnObj() : nullptr;
+                    if (!frameMesh) continue;
+                    AppendFrame(frameMesh, *part.mesh, frame, group.pivot);
+                    for (size_t i = 0; i < materials.size(); ++i)
+                        if (materials[i]) eng::Call(frameComponent, "SetMaterial", static_cast<int32_t>(i), materials[i]);
+                    eng::Call(frameComponent, "SetTranslucentSortPriority", kGlassSortPriority);
+                    eng::Call(frameComponent, "SetCollisionEnabled", uint8_t{0});
+                    eng::Call(frameActor, "K2_AttachToComponent", component, std::array<uint8_t, 8>{}, snap, snap, snap, uint8_t{0});
+                    eng::Call(frameComponent, "SetVisibility", uint8_t{0}, uint8_t{0});
+                    flip.frames.push_back(eng::MakeWeak(frameActor));
+                }
+            const auto took = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - started).count();
+            hostlog::Info("models: " + std::to_string(flip.frames.size()) + " frames of " + std::to_string(part.mesh->triangles) +
+                          " triangles built in " + std::to_string(took) + " ms");
+            built.flips.push_back(std::move(flip));
+        }
     }
     return built;
+}
+
+std::vector<Obj> Actors(const Built& built) {
+    std::vector<Obj> out;
+    for (const auto& a : built.actors)
+        if (Obj actor = eng::Get(a)) out.push_back(actor);
+    for (const auto& f : built.flips)
+        for (const auto& a : f.frames)
+            if (Obj actor = eng::Get(a)) out.push_back(actor);
+    return out;
 }
 
 namespace {
@@ -701,12 +1052,39 @@ void Animate(const Model& model, Built& built, Obj ballActor, double seconds) {
         p.Set("bTeleport", uint8_t{1});
         eng::Invoke(component, p);
     }
+    // Animated meshes: the clip plays faster as the ball goes faster ("rate" at rest, "run" more per m/s), and the
+    // idle clip, if there is one, while the ball is still.
+    constexpr double kStill = 0.5;                      // m/s
+    for (auto& flip : built.flips) {
+        const MeshData& m = *flip.mesh;
+        const bool idling = !m.idle.empty() && built.pace < kStill;
+        if (idling != flip.idling) {
+            flip.idling = idling;
+            flip.time = 0;
+        }
+        const double length = idling ? m.idleLength : m.clipLength;
+        const size_t count = idling ? m.idle.size() : m.clip.size();
+        if (count == 0 || length <= 0) continue;
+        flip.time = std::fmod(flip.time + dt * (idling ? 1 : m.rate + m.run * built.pace), length);
+        if (flip.time < 0) flip.time += length;
+        const size_t frame = std::min(count - 1, static_cast<size_t>(flip.time / length * static_cast<double>(count)));
+        const int index = static_cast<int>(idling ? m.clip.size() + frame : frame);
+        if (index == flip.shown || index >= static_cast<int>(flip.frames.size())) continue;
+        auto show = [&](int i, bool on) {
+            Obj actor = i >= 0 && i < static_cast<int>(flip.frames.size()) ? eng::Get(flip.frames[static_cast<size_t>(i)]) : nullptr;
+            Obj component = actor ? eng::ReadObj(actor, "DynamicMeshComponent") : nullptr;
+            if (component) eng::Call(component, "SetVisibility", static_cast<uint8_t>(on), uint8_t{0});
+        };
+        show(index, true);
+        show(flip.shown, false);
+        flip.shown = index;
+    }
 }
 
 void Destroy(Built& built) {
-    for (const auto& a : built.actors)
-        if (Obj actor = eng::Get(a)) eng::Call(actor, "K2_DestroyActor");
+    for (Obj actor : Actors(built)) eng::Call(actor, "K2_DestroyActor");
     built.actors.clear();
+    built.flips.clear();
 }
 
 namespace {

@@ -57,7 +57,8 @@ A folder in the game's `plugins` folder with two files:
   style, and a section docked in the editor's details panel.
 - [Cosmetic Kit](https://github.com/AnythingGoes-ballest/ballest-cosmetic-kit) and
   [Example Cosmetics](https://github.com/AnythingGoes-ballest/ballest-example-cosmetics): one plugin offering functions
-  to others, and one depending on it to add custom balls, a hat and a goal explosion, with models.
+  to others, and one depending on it to add custom balls, hats and a goal explosion, with models: shapes described in
+  text, and 3D model files from Blender (an animated T-rex and skeleton running inside clear balls, a baseball cap).
 - [Monkey Balls](https://github.com/AnythingGoes-ballest/ballest-monkey-balls): characters that run inside clear
   balls, with limbs that swing from their joints and keep time with the ball.
 - [Fit Window](https://github.com/AnythingGoes-ballest/ballest-fit-window): a few lines that maximize the game's

@@ -52,5 +52,7 @@ bool ClickTile(int index);      // test: presses a custom tile of the section on
 // Engine helpers the cosmetics need, usable elsewhere.
 eng::Obj LoadAsset(const std::wstring& path);      // an asset by object path, loaded if it is not in memory
 void KeepAlive(eng::Obj o);                        // never garbage collected (referenced by the game instance)
+eng::Obj LoadTexture(const std::wstring& file);    // a PNG or JPEG file as a texture (kept alive), or null
+eng::Obj ImageMaterial(eng::Obj texture, const std::string& name);   // the LBall material showing the texture
 
 }  // namespace cosmetics

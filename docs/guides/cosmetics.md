@@ -6,7 +6,8 @@ section at the bottom of its tab, and choosing it works like choosing one of the
 The easy way is to depend on [Cosmetic Kit](https://github.com/AnythingGoes-ballest/ballest-cosmetic-kit), which also
 remembers what the player wears. [Example Cosmetics](https://github.com/AnythingGoes-ballest/ballest-example-cosmetics)
 is a complete example: a smiley ball, a morph ball with raised seams and glowing lights, a meatball with a spinning
-saw, a fruit basket hat and a confetti goal explosion.
+saw, a T-rex and a skeleton running inside clear balls (3D model files), a fruit basket hat, a baseball cap and a
+confetti goal explosion.
 
 ```toml
 # info.toml
@@ -119,6 +120,52 @@ sphere light r=4 at=0,-62,0
 ```
 
 If a model has a mistake, the cosmetic isn't added and the log says which line.
+
+## 3D model files
+
+Models made in Blender or another 3D tool can be used as they are, with their colours, textures and animations
+(host 0.16.0 and newer). Export one of:
+
+- **glTF 2.0**: `.glb` (one file), or `.gltf` with its `.bin` and images next to it. Blender: File > Export > glTF 2.0.
+  Leave mesh compression (Draco) off.
+- **OBJ**: `.obj` with its `.mtl` (and any image the `.mtl` names) next to it. No animations.
+
+FBX isn't read: export glTF instead. Keep models light: every frame of an animation is a mesh of its own (a few
+thousand triangles is plenty; the examples are 1,800 and 5,300).
+
+A model file can be the whole model: pass it as `model` (`f + "models/lamp.glb"`). On a ball it stands on the bottom of
+the ball, 80 cm across; on a hat it stands on the top of the ball, 40 cm across. Or place it in a model's text file with a `mesh` line, alongside shapes and groups:
+
+```
+mesh <file> [size=<cm>] [at=x,y,z] [rot=pitch,yaw,roll] [scale=x,y,z] [material=<name>]
+     [anim=<name>] [rate=1] [run=0] [idle=<name>] [frames=24]
+```
+
+- `<file>` is next to the text file (in quotes if its name has spaces).
+- `size` makes its longest side that many cm. It stands on `at`: the bottom of its bounds, centred there, after `rot`
+  has turned it. The file's front (Blender's -Y, glTF's +Z) faces the ball's forward direction, which on a hat is the
+  way the brim of a cap should point.
+- Its **colours** come from the file: a base colour (plastic, or metal when metallic), a base colour texture, an
+  emissive colour (glows), or an alpha below 1 (tinted glass). `material=` uses one of the text file's materials
+  for all of it instead.
+- `anim` plays one of the file's animations (its name, or part of it): `rate` times its own speed while the ball is
+  still, plus `run` more for every m/s of the ball's speed. `idle` plays another animation while the ball is still
+  (below 0.5 m/s). Each is baked into `frames` poses when the plugin loads (skinned characters too).
+- Put the `mesh` in a `travel` group to keep it upright and facing where the ball goes, like a runner.
+
+```
+# a T-rex running inside a clear ball (AddBall with no image)
+group dino travel
+mesh trex.glb size=85 at=0,0,-44 anim=run rate=0.6 run=0.1 idle=idle
+```
+
+```
+# a cap from a file that has it tilted and facing back: turned upright, brim forward
+mesh cap.glb size=36 rot=-10.7,-141.9,8.5
+```
+
+If a file can't be read, the log says why (a missing `.bin`, compression, an animation that isn't there, with the
+names of those that are).
 
 ## Goal explosions
 

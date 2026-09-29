@@ -11,6 +11,9 @@
 #include <scriptarray/scriptarray.h>
 #include <scriptstdstring/scriptstdstring.h>
 
+#include <sstream>
+#include <cstring>
+#include <cctype>
 #include <string>
 #include <utility>
 
@@ -872,19 +875,62 @@ std::wstring PluginFile(const std::string& path, bool* ok) {
     }
     return resolved;
 }
-// A model file (models.hpp's format) in the plugins folder, read whole; "" for none.
-bool ModelText(const std::string& path, std::string* text) {
+// A model file (models.hpp's format) in the plugins folder, read whole; "" for none. A 3D model file (.glb, .gltf,
+// .obj) is a model of that mesh alone. The files a model's "mesh" lines name are found next to it, must be in the
+// plugins folder too, and are passed on by their full path.
+bool IsMeshFile(const std::string& path) {
+    std::string lower = path;
+    for (char& c : lower) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    for (const char* ext : {".glb", ".gltf", ".obj"})
+        if (lower.size() > std::strlen(ext) && lower.compare(lower.size() - std::strlen(ext), std::string::npos, ext) == 0) return true;
+    return false;
+}
+bool ModelText(const std::string& path, std::string* text, bool hat = false) {
     text->clear();
     if (path.empty()) return true;
     bool ok = false;
     const std::wstring file = PluginFile(path, &ok);
     if (!ok) return false;
+    if (IsMeshFile(path)) {
+        // On a ball: standing on its bottom, 80 cm across; on a hat: on the hat slot, 40 cm across.
+        *text = "mesh \"" + eng::Narrow(file.c_str(), static_cast<int>(file.size())) + (hat ? "\" size=40\n" : "\" size=80 at=0,0,-44\n");
+        return true;
+    }
     HANDLE h = CreateFileW(file.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, 0, nullptr);
     if (h == INVALID_HANDLE_VALUE) return false;
+    std::string raw;
     char buf[4096];
     DWORD n = 0;
-    while (ReadFile(h, buf, sizeof buf, &n, nullptr) && n > 0 && text->size() < 256 * 1024) text->append(buf, n);
+    while (ReadFile(h, buf, sizeof buf, &n, nullptr) && n > 0 && raw.size() < 256 * 1024) raw.append(buf, n);
     CloseHandle(h);
+    const std::string folder = eng::Narrow(file.c_str(), static_cast<int>(file.find_last_of(L"\\/") + 1));
+    std::stringstream lines(raw);
+    std::string line;
+    while (std::getline(lines, line)) {
+        const size_t first = line.find_first_not_of(" \t");
+        if (first != std::string::npos && line.compare(first, 5, "mesh ") == 0) {
+            size_t at = line.find_first_not_of(" \t", first + 4), end;
+            std::string name;
+            if (at != std::string::npos && line[at] == '"') {
+                end = line.find('"', at + 1);
+                if (end == std::string::npos) end = line.size() - 1;
+                name = line.substr(at + 1, end - at - 1);
+                ++end;
+            } else if (at != std::string::npos) {
+                end = line.find_first_of(" \t\r", at);
+                if (end == std::string::npos) end = line.size();
+                name = line.substr(at, end - at);
+            } else {
+                end = line.size();
+            }
+            const bool absolute = name.size() > 1 && name[1] == ':';
+            bool inside = false;
+            const std::wstring resolved = PluginFile(absolute ? name : folder + name, &inside);
+            if (!inside) return false;
+            line = line.substr(0, first) + "mesh \"" + eng::Narrow(resolved.c_str(), static_cast<int>(resolved.size())) + "\"" + line.substr(end);
+        }
+        *text += line + "\n";
+    }
     return true;
 }
 bool CosmeticsAddBall(const std::string& id, const std::string& name, const std::string& image, const std::string& preview,
@@ -899,7 +945,7 @@ bool CosmeticsAddHat(const std::string& id, const std::string& name, const std::
     bool ok = false;
     std::string text;
     const std::wstring picture = PluginFile(preview, &ok);
-    return ok && scale > 0 && ModelText(model, &text) && cosmetics::AddHat(id, name, mesh, scale, picture, text);
+    return ok && scale > 0 && ModelText(model, &text, true) && cosmetics::AddHat(id, name, mesh, scale, picture, text);
 }
 bool CosmeticsAddBfx(const std::string& id, const std::string& name, const std::string& base, double scale,
                      const std::string& preview, const std::string& system, const std::string& sound) {

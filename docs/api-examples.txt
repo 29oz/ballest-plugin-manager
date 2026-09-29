@@ -1681,7 +1681,7 @@ Adds a ball. `AddBall(id, name, image, preview, model)`:
 | `name` | The ball's name, shown in the game: `"planet"`. |
 | `image` | The ball's texture: the full path of a PNG in your plugin's folder, twice as wide as it is tall (1024x512). Left to right goes once around the ball, top to bottom from pole to pole. Or `""` for a clear glass ball, to show a `model` inside it. |
 | `preview` | The picture on its tile on the Customize page (a PNG in your folder), or `""` to show the texture. |
-| `model` | Optional: a [model file](../../guides/cosmetics.md#models) of 3D parts built around the ball and rolling with it (raised details, lights, a spinning blade), or `""` for none. |
+| `model` | Optional: a [model file](../../guides/cosmetics.md#models) of 3D parts built around the ball and rolling with it (raised details, lights, a spinning blade), a [3D model file](../../guides/cosmetics.md#3d-model-files) (`.glb`, `.gltf` or `.obj`, from host 0.16.0), or `""` for none. |
 
 Returns false, and logs why, if it can't be added.
 --
@@ -1702,7 +1702,7 @@ Adds a hat. `AddHat(id, name, mesh, scale, preview, model)`:
 | `mesh` | A mesh asset from the game or engine to wear (`"/Engine/BasicShapes/Cone.Cone"`), or `""` when the hat is a `model` instead. |
 | `scale` | Its size where the game puts hats (the top of the ball): 1 is as it is; the engine's 1 m shapes want about 0.45. |
 | `preview` | The picture on its tile, or `""` for none. |
-| `model` | Optional: a [model file](../../guides/cosmetics.md#models) built on the top of the ball, or `""`. |
+| `model` | Optional: a [model file](../../guides/cosmetics.md#models) built on the top of the ball, a [3D model file](../../guides/cosmetics.md#3d-model-files) (`.glb`, `.gltf` or `.obj`, from host 0.16.0), or `""`. |
 --
 string f = Plugins::Folder();
 // a mesh hat

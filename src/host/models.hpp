@@ -21,10 +21,20 @@
 //     spiral r= inner= turns= thick=
 //   A bowl is the lower half of a sphere's shell, centred on "at" (open at the top); a spiral is a tube coiled flat
 //   around z from radius r in to radius inner.
+//   mesh <file> [size=<cm>] [at=x,y,z] [rot=pitch,yaw,roll] [scale=x,y,z] [material=<name>]
+//        [anim=<name>] [rate=<times its speed at rest>] [run=<more a second per m/s of the ball>] [idle=<name>]
+//        [frames=<a clip>]
+//     a model file from Blender or another 3D tool: glTF 2.0 (.glb, or .gltf) or OBJ (.obj with its .mtl), next to
+//     the model's text file. It stands on "at" (the bottom of its bounds, centred), its longest side "size" cm (as
+//     the file has it without). Its colours, glow, see-through parts and textures come from the file, or all of it
+//     is "material". "anim" plays one of its animations (a name, or part of one), faster as the ball speeds up;
+//     "idle" plays instead while the ball is still. Animations are baked into "frames" poses (24 by default).
 //   Spheres, boxes, discs, rings and saws are centred on "at"; cylinders, cones, capsules and cups stand on it (along
 //   +z). Rings and saws lie flat (around z).
 #pragma once
 #include <array>
+#include <cstdint>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -32,20 +42,39 @@
 
 namespace models {
 
-enum class Finish { Plastic, Metal, Glow, Glass };
+enum class Finish { Plastic, Metal, Glow, Glass, Image };
 struct Material {
     std::string name;
     Finish finish = Finish::Plastic;
+    std::wstring image;                 // Image: the texture's file
     float r = 1, g = 1, b = 1;          // linear
     float rough = 0.5f, bright = 5;
     float opacity = 0.2f;               // glass
     bool tinted = false;                // glass: given a colour
 };
 
-enum class Shape { Sphere, Box, Cylinder, Cone, Capsule, Disc, Ring, Saw, Cup, Bowl, Spiral };
+enum class Shape { Sphere, Box, Cylinder, Cone, Capsule, Disc, Ring, Saw, Cup, Bowl, Spiral, Mesh };
+
+// A model file's triangles, placed and baked: its rest pose, and each frame of its animations. Positions are where
+// the part puts them (in the group's space, before its pivot), in cm.
+struct Frame {
+    std::vector<std::vector<float>> positions, normals;     // per item, 3 per vertex
+};
+struct MeshData {
+    std::wstring file;
+    std::vector<int> materials;                             // per item: the model's material
+    std::vector<std::vector<float>> uv;                     // per item, 2 per vertex
+    std::vector<std::vector<uint32_t>> indices;             // per item, 3 per triangle
+    Frame rest;
+    std::vector<Frame> clip, idle;                          // "anim" and "idle", evenly over each
+    double clipLength = 0, idleLength = 0, rate = 1, run = 0;
+    size_t triangles = 0;
+};
+
 struct Part {
     Shape shape;
     int material = 0;
+    std::shared_ptr<const MeshData> mesh;       // Mesh
     double r = 0, h = 0, top = 0, thick = 0, depth = 0, hole = 0, degrees = 360, inner = 0, turns = 0, size[3] = {0, 0, 0};
     int teeth = 0;
     double at[3] = {0, 0, 0}, rot[3] = {0, 0, 0}, scale[3] = {1, 1, 1};
@@ -74,12 +103,24 @@ struct Model {
     Tempo tempo;
 };
 
-// False with the line and reason in `error` if the text is not a model.
-bool Parse(const std::string& text, Model* model, std::string* error);
+// False with the line and reason in `error` if the text is not a model. Mesh files named in it are found in `folder`
+// (a path from the text is taken as it is when absolute).
+bool Parse(const std::string& text, Model* model, std::string* error, const std::wstring& folder = L"");
 
 // A model built on a component: one actor per group.
 struct Built {
     std::vector<eng::Weak> actors;      // by group
+    // An animated mesh part: one actor per frame (the clip's, then the idle's), attached to its group's; the frame
+    // shown is the only one visible.
+    struct Flip {
+        size_t group = 0;
+        std::shared_ptr<const MeshData> mesh;
+        std::vector<eng::Weak> frames;
+        int shown = -1;
+        double time = 0;                // in the clip being played
+        bool idling = false;
+    };
+    std::vector<Flip> flips;
     eng::Weak parent;
     double travelYaw = 90;             // until the ball moves: side-on to the Customize camera (measured)
     bool facing = false;                // travelYaw has been set from the camera or the ball's travel
@@ -100,6 +141,7 @@ struct Colour {
 };
 eng::Obj SpawnTube(const std::vector<std::array<double, 3>>& path, double radius, const Colour& colour);   // along the points
 eng::Obj SpawnBall(double radius, const Colour& colour);
+std::vector<eng::Obj> Actors(const Built& built);       // every actor of a built model (groups and frames)
 // An empty mesh actor in this colour (tinted glass when see-through), and a tube added to one: many tubes in one mesh
 // are one object to draw. sides: of the tube's cross-section.
 eng::Obj SpawnMesh(const Colour& colour);

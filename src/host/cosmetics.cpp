@@ -553,8 +553,7 @@ std::vector<Obj> ModelActorsOn(Obj ball) {
     for (const auto& m : gModels) {
         Obj component = eng::Get(m.component);
         if (!component || eng::OuterOf(component) != ball) continue;
-        for (const auto& a : m.built.actors)
-            if (Obj actor = eng::Get(a)) out.push_back(actor);
+        for (Obj actor : models::Actors(m.built)) out.push_back(actor);
     }
     return out;
 }
@@ -745,6 +744,36 @@ void Highlight(Obj page, int tab) {
 // Referenced from the game instance's ReferencedObjects (a UPROPERTY array the collector follows; the game instance
 // lives for the whole session). The root-set flag alone is not enough on this build: measured, an object with it set
 // was still collected by the next garbage collection.
+Obj LoadTexture(const std::wstring& file) { return Texture(file); }
+
+// The game's LBall material (MI_LBall05) showing an image: as image balls are drawn, and textured model parts.
+Obj ImageMaterial(Obj texture, const std::string& name) {
+    Obj parent = LoadAsset(kImageBallMaterial);
+    if (!texture || !parent) return nullptr;
+    Obj material = eng::Call(Library("KismetMaterialLibrary"), "CreateDynamicMaterialInstance", game::PlayerController(), parent,
+                             MakeName(name), uint8_t{0})
+                       .ReturnObj();
+    if (!material) return nullptr;
+    SetTexture(material, "Base Color", texture);
+    if (Obj flat = LoadAsset(kFlatNormal)) SetTexture(material, "Normal Map", flat);
+    // Plastic rather than LBall's mirror finish: MI_LBall05 reads roughness, metallic and occlusion from channels of
+    // its "Pack Map" (measured: roughness G, metallic B, occlusion R, picked by these vector parameters). With a
+    // white pack map, the channel vectors set the values directly.
+    if (Obj white = LoadAsset(kWhite)) {
+        SetTexture(material, "Pack Map", white);
+        SetVector(material, "[Roughness] Roughness Channel", 0, 0.55f, 0, 0);
+        SetVector(material, "[Metallic] Metallic Channel", 0, 0, 0, 0);
+        SetVector(material, "[AO] Ambient Occlusion Channel", 1, 0, 0, 0);
+    }
+    // No LBall glow: its master (M_LBall05_Master, read from the cooked package) adds EmissiveColor through
+    // T_LBall05_EmissiveMask, strength from EmissiveStrengthLow to EmissiveStrengthHigh by MPC_BallProperties'
+    // BallSpeed, which drew LBall's yellow panels over the image at speed (reported).
+    SetVector(material, "EmissiveColor", 0, 0, 0, 0);
+    SetScalar(material, "EmissiveStrengthLow", 0);
+    SetScalar(material, "EmissiveStrengthHigh", 0);
+    return material;
+}
+
 void KeepAlive(Obj o) {
     Obj instance = GameInstance();
     ArrayHeader array{nullptr, 0, 0};
@@ -813,28 +842,9 @@ bool AddBall(const std::string& id, const std::string& name, const std::wstring&
         hostlog::Warn("cosmetics: ball " + id + ": " + (texture ? "the ball material did not load" : "the image did not load"));
         return false;
     }
-    Obj material = eng::Call(Library("KismetMaterialLibrary"), "CreateDynamicMaterialInstance", game::PlayerController(), parent,
-                             MakeName("CustomBall_" + id), uint8_t{0})
-                       .ReturnObj();
+    Obj material = ImageMaterial(texture, "CustomBall_" + id);
     if (!material) return false;
     KeepAlive(material);
-    SetTexture(material, "Base Color", texture);
-    if (Obj flat = LoadAsset(kFlatNormal)) SetTexture(material, "Normal Map", flat);
-    // Plastic rather than LBall's mirror finish: MI_LBall05 reads roughness, metallic and occlusion from channels of
-    // its "Pack Map" (measured: roughness G, metallic B, occlusion R, picked by these vector parameters). With a
-    // white pack map, the channel vectors set the values directly.
-    if (Obj white = LoadAsset(kWhite)) {
-        SetTexture(material, "Pack Map", white);
-        SetVector(material, "[Roughness] Roughness Channel", 0, 0.55f, 0, 0);
-        SetVector(material, "[Metallic] Metallic Channel", 0, 0, 0, 0);
-        SetVector(material, "[AO] Ambient Occlusion Channel", 1, 0, 0, 0);
-    }
-    // No LBall glow: its master (M_LBall05_Master, read from the cooked package) adds EmissiveColor through
-    // T_LBall05_EmissiveMask, strength from EmissiveStrengthLow to EmissiveStrengthHigh by MPC_BallProperties'
-    // BallSpeed, which drew LBall's yellow panels over the image at speed (reported).
-    SetVector(material, "EmissiveColor", 0, 0, 0, 0);
-    SetScalar(material, "EmissiveStrengthLow", 0);
-    SetScalar(material, "EmissiveStrengthHigh", 0);
     Obj asset = Create(Kind::Ball, id, name, preview.empty() ? texture : Texture(preview));
     if (!asset) return false;
     SetObject(asset, "SkinMaterial", material);
