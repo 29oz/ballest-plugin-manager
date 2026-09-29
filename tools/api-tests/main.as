@@ -1571,21 +1571,27 @@ void RegisterRace()
         return Is(moved > 100, "Race::BallPosition: the ball moved " + int(moved) + " cm with W held 1.5 s");
     }, 8);
     Add("race", "Race restart", "Race::Restarts", function() {
+        // Backspace restarts from the beginning. Measured on the 2026-09-29 13:27 build: the game counts it 3 to 5 s
+        // after the key; a press during the start countdown, or before the run has begun, is ignored; a second press
+        // while it restarts puts it off again. So: one press, and one more 6.5 s later only if the first was ignored.
         if (step == 0)
         {
             id1 = Race::Restarts();
+            Console::Run("post 8 200");
             step = 1;
         }
         if (Race::Restarts() > id1)
             return PASS;
-        if (Elapsed() > d1)
+        if (step == 1 && Elapsed() > 6.5)
         {
-            Console::Run("post 8 200");              // Backspace: restart from the beginning
-            d1 = Elapsed() + 2.5;
+            Console::Run("post 8 200");
+            step = 2;
         }
-        return WAIT;
-    }, 10);
+        return Elapsed() > 13 ? "Race::Restarts " + Race::Restarts() + " after two restarts (Backspace), want " + (id1 + 1) : WAIT;
+    }, 15);
     Add("race", "Race save and load the ball", "Race::SaveBall,Race::LoadBall", function() {
+        if (step == 0 && (!Race::IsActive() || Race::RunId() < 0))
+            return WAIT;                            // the restarted run begins
         if (step == 0)
         {
             savedBall = Race::SaveBall();
