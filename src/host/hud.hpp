@@ -41,4 +41,12 @@ void SetBlink(const std::string& key);          // that element blinks (and show
 bool SetPartColor(const std::string& key, const std::string& part, float r, float g, float b, float a);
 void ResetPartColor(const std::string& key, const std::string& part);
 
+// The game's whole race UI (WBP_RaceUIManager: the HUD, the header, leaderboard and the race's menus) hidden while any
+// plugin asks, for a view of the track with nothing over it: render opacity 0 and no clicks (so its buttons, such as
+// "play", can't be pressed unseen). Re-applied while it lasts; put back when the last plugin lets go or stops.
+void HideGame(int owner, bool hidden);
+// The player's own ball and what's attached to it hidden (true) or given back (false), while any plugin wants it hidden.
+void HideBall(int owner, bool hidden);
+void RemoveOwner(int owner);
+
 }  // namespace hud

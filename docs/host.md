@@ -16,7 +16,7 @@ for changing the host itself. For writing plugins, start at [Your first plugin](
 3. Every frame, on the game thread: input, the world (player controller, map changes), races, replays, UI, the
    registry's installs and removals, then plugins.
 4. Plugins are compiled from `plugins/<id>/` into separate AngelScript modules. Each callback runs within a time
-   budget; a plugin that throws or overruns is stopped and shown as stopped, and the game carries on. Plugins can
+   budget; a plugin that throws, or overruns more than 3 times in a minute, is stopped and shown as stopped, and the game carries on. Plugins can
    be loaded and unloaded while the game runs; an unloaded plugin's UI goes with it.
 
 Two rules keep the host from touching freed memory: pointers are only used in the frame they were obtained, and
@@ -142,7 +142,7 @@ to the log in `types\`:
 - `Ballest.usmap`: the type mappings tools like FModel and CUE4Parse need to read the game's cooked assets. With it,
   blueprints can be dumped (their Kismet bytecode), which is how the editor's click, save and palette logic behind
   the Editor API was read. Dump it again after a game update: the game moved from Unreal 5.3 to 5.8 in
-  September 2026, and a mapping file from another build misreads assets.
+  September 2026, and a mapping file from another build misreads assets.
 
 ## The docs site
 

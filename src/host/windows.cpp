@@ -4,10 +4,12 @@
 // after a map change or a layout change. Switching views only changes visibility.
 #include <windows.h>
 
+#include <algorithm>
 #include <cctype>
 #include <cstdlib>
 #include <map>
 
+#include "cosmetics.hpp"
 #include "editor.hpp"
 #include "game.hpp"
 #include "input.hpp"
@@ -38,6 +40,13 @@ Obj LoadTexture(const std::string& path) {
     static std::map<std::string, eng::Weak> textures;
     if (Obj cached = eng::Get(textures[path])) return cached;
     const std::wstring wide = eng::Widen(path);
+    // A texture of the game's ("/Game/Maps/Screenshots/IMG_TheTower.IMG_TheTower"): loaded as an asset.
+    if (path.rfind("/Game/", 0) == 0) {
+        Obj asset = cosmetics::LoadAsset(wide);
+        textures[path] = eng::MakeWeak(asset);
+        if (!asset) hostlog::Warn("image could not be loaded: " + path);
+        return asset;
+    }
     if (path.empty() || GetFileAttributesW(wide.c_str()) == INVALID_FILE_ATTRIBUTES) return nullptr;
     const eng::FString file{wide.c_str(), static_cast<int32_t>(wide.size() + 1), static_cast<int32_t>(wide.size() + 1)};
     Obj texture = eng::Call(eng::FindCdo("KismetRenderingLibrary"), "ImportFileAsTexture2D", game::PlayerController(), file).ReturnObj();
@@ -49,6 +58,8 @@ Obj LoadTexture(const std::string& path) {
 void ShowImage(Obj image, const std::string& path) {
     Obj texture = LoadTexture(path);
     if (image && texture) eng::Call(image, "SetBrushFromTexture", texture, uint8_t{0});
+    // No picture (yet): a dark box rather than the image widget's plain white brush.
+    if (image) eng::Call(image, "SetColorAndOpacity", texture ? ui::Color{1, 1, 1, 1} : ui::Color{0.02f, 0.022f, 0.03f, 1});
 }
 
 // Play is a right-pointing triangle built from stacked bars; pause is two bars. Drawn from rectangles rather
@@ -130,7 +141,7 @@ Obj BuildWidget(Obj tree, Widget& item) {
             Obj box = w::Spawn("SizeBox", tree), slider = w::Spawn("Slider", tree);
             if (!box || !slider) return nullptr;
             w::Unfocusable(slider);
-            eng::Call(box, "SetWidthOverride", item.width);
+            if (item.width > 0) eng::Call(box, "SetWidthOverride", item.width);     // 0: the rest of the row
             eng::Call(slider, "SetMinValue", 0.0f);
             eng::Call(slider, "SetMaxValue", 1.0f);
             eng::Call(slider, "SetSliderBarColor", Color{0.4f, 0.4f, 0.4f, 1});
@@ -218,6 +229,15 @@ Obj BuildWidget(Obj tree, Widget& item) {
             item.shownChecked = item.checked;
             return row;
         }
+        case Kind::Rect: {
+            Obj rect = w::Spawn("Border", tree);
+            if (!rect) return nullptr;
+            eng::Call(rect, "SetBrushColor", item.color);
+            w::SetVisibility(rect, w::kHitTestInvisible);
+            item.colorDirty = false;
+            item.main = eng::MakeWeak(rect);
+            return rect;
+        }
         case Kind::Image: {
             Obj box = w::Spawn("SizeBox", tree), image = w::Spawn("Image", tree);
             if (!box || !image) return nullptr;
@@ -277,6 +297,7 @@ void Build(Window& win) {
             }
         win.rectPending = false;
     }
+    if (win.cornerRadius > 0) w::RoundCorners(border, win.cornerRadius);     // as cards are
     eng::Call(border, "SetBrushColor", win.background);
     const w::Margin padding = sized ? w::Margin{16, 16, 16, 16} : w::Margin{12, 8, 12, 8};
 
@@ -292,6 +313,17 @@ void Build(Window& win) {
             eng::Call(slot, "SetPadding", w::Margin{0, 0, 16, 0});
         w::FillSlot(eng::Call(body, "AddChildToHorizontalBox", column).ReturnObj());
         content = body;
+    }
+    // Placed items: a CanvasPanel laid over the rows, the same size.
+    Obj placedLayer = nullptr;
+    if (std::any_of(win.items.begin(), win.items.end(), [](const auto& i) { return i->placed && !i->retired; })) {
+        Obj layer = w::Spawn("Overlay", tree);
+        placedLayer = w::Spawn("CanvasPanel", tree);
+        if (!layer || !placedLayer) return;
+        w::AddToOverlay(layer, content, w::kAlignFill, w::kAlignFill, {0, 0, 0, 0});
+        w::AddToOverlay(layer, placedLayer, w::kAlignFill, w::kAlignFill, {0, 0, 0, 0});
+        w::SetVisibility(placedLayer, w::kHitTestInvisible);
+        content = layer;
     }
     const bool movable = win.movable && !sized;
     if (win.blocksClicks || movable) {
@@ -384,6 +416,16 @@ void Build(Window& win) {
             w::SetVisibility(widget, w::kCollapsed);
             item.shownVisible = false;
         }
+        if (item.placed) {
+            Obj slot = placedLayer && widget ? w::AddToCanvas(placedLayer, widget, 0, 0, {0, 0}, {item.px, item.py}) : nullptr;
+            if (slot && item.kind == Kind::Rect) {
+                eng::Call(slot, "SetAutoSize", uint8_t{0});
+                eng::Call(slot, "SetSize", w::Vec2{item.pw, item.ph});
+            }
+            item.placedSlot = eng::MakeWeak(slot);
+            item.placeDirty = false;
+            continue;
+        }
         if (item.inSidebar) {
             // One per line, as wide as the sidebar.
             Obj slot = sidebar && widget ? eng::Call(sidebar, "AddChildToVerticalBox", widget).ReturnObj() : nullptr;
@@ -396,7 +438,9 @@ void Build(Window& win) {
         int& placed = placedInRow[static_cast<size_t>(item.row)];
         Obj slot = w::AddToRow(rows[static_cast<size_t>(item.row)], widget, placed++ == 0 ? 0.0f : (item.kind == Kind::Text ? 14.0f : 8.0f));
         const bool fillsWidth =
-            (item.kind == Kind::Space || item.kind == Kind::TextArea || item.kind == Kind::TextInput || item.kind == Kind::Image) && item.width <= 0;
+            (item.kind == Kind::Space || item.kind == Kind::TextArea || item.kind == Kind::TextInput || item.kind == Kind::Image ||
+             item.kind == Kind::Slider) &&
+            item.width <= 0;
         if (fillsWidth) w::FillSlot(slot);
         if (item.kind == Kind::TextArea && item.height <= 0) eng::Call(slot, "SetVerticalAlignment", w::kAlignFill);
     }
@@ -474,7 +518,20 @@ void Sync(Widget& item) {
         w::SetVisibility(eng::Get(item.outer), item.visible ? item.normalVisibility : w::kCollapsed);
         item.shownVisible = item.visible;
     }
+    if (item.placed && item.placeDirty) {
+        if (Obj slot = eng::Get(item.placedSlot)) {
+            eng::Call(slot, "SetPosition", w::Vec2{item.px, item.py});
+            if (item.kind == Kind::Rect) eng::Call(slot, "SetSize", w::Vec2{item.pw, item.ph});
+        }
+        item.placeDirty = false;
+    }
     switch (item.kind) {
+        case Kind::Rect:
+            if (item.colorDirty) {
+                eng::Call(main, "SetBrushColor", item.color);
+                item.colorDirty = false;
+            }
+            break;
         case Kind::Text:
             if (item.text != item.shownText) {
                 w::SetText(main, item.text);
@@ -749,9 +806,34 @@ Widget* AddWidget(Window* win, Kind kind, const std::string& text, float sizeOrW
     return win->items.back().get();
 }
 
+Widget* AddPlaced(Window* win, Kind kind, const std::string& text, float size, float x, float y, float width, float height) {
+    Widget* item = AddWidget(win, kind, text, kind == Kind::Text ? size : width);
+    item->placed = true;
+    item->px = x;
+    item->py = y;
+    item->pw = width;
+    item->ph = height;
+    return item;
+}
+
+void Place(Widget* item, float x, float y, float width, float height) {
+    if (item->px == x && item->py == y && item->pw == width && item->ph == height) return;
+    item->px = x;
+    item->py = y;
+    item->pw = width;
+    item->ph = height;
+    item->placeDirty = true;
+}
+
 void AddOption(Widget* dropdown, const std::string& option) {
     dropdown->options.push_back(option);
     dropdown->window->layoutDirty = true;
+}
+
+void ClearOptions(Widget* dropdown) {
+    dropdown->options.clear();
+    dropdown->selected = -1;
+    dropdown->window->layoutDirty = true;       // the window is built again, the dropdown with the options it has
 }
 
 namespace windows {

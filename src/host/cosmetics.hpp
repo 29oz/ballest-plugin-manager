@@ -46,6 +46,7 @@ std::string Equipped(Kind kind);
 
 void Frame();                   // the custom section on the Customize page, and the plain sphere for image balls
 std::string Status();           // for the test channel
+std::vector<eng::Obj> ModelActorsOn(eng::Obj ball);    // the models built on this ball (its sphere and hat slot)
 bool ClickTile(int index);      // test: presses a custom tile of the section on screen (-n: the game's n-th), as a click does
 
 // Engine helpers the cosmetics need, usable elsewhere.

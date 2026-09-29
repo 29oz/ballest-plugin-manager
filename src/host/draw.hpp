@@ -1,0 +1,46 @@
+// Things plugins draw in the world, and a camera they can look through. Used by the ghost viewer: each player's path
+// as a tube, their ball as a sphere moving along it, the view flown around the track.
+//
+// Shapes are Geometry Script meshes (models::SpawnTube / SpawnBall) with no collision and no shadow, never attached to
+// anything; they belong to the plugin that made them and go when it stops or the map changes. The camera is a
+// CameraActor the player controller is set to view through (SetViewTargetWithBlend); releasing it goes back to
+// the pawn. Game thread only.
+#pragma once
+#include <array>
+#include <string>
+#include <vector>
+
+#include "engine.hpp"
+
+namespace draw {
+
+void Frame();                           // forgets what went with the map
+void RemoveOwner(int owner);            // a plugin stopped: its shapes go, and its camera is released
+
+// A shape; 0 if it could not be made. Colours are linear, 0..1.
+// opacity below 1: see-through (the game's tinted glass), glow then ignored.
+int Tube(int owner, const std::vector<std::array<double, 3>>& path, double radius, float r, float g, float b, bool glow, float opacity = 1);
+int Ball(int owner, double radius, float r, float g, float b, bool glow);
+bool Move(int owner, int id, double x, double y, double z);
+// A glowing shape's colour and brightness (0 dark), changed in place.
+bool Glow(int owner, int id, float r, float g, float b, float bright);
+// A see-through shape's opacity (0..1), changed in place.
+bool Fade(int owner, int id, float opacity);
+int Adopt(int owner, eng::Obj actor);   // an actor made elsewhere, kept like a shape (moved, shown, removed with it)
+eng::Obj ActorOf(int owner, int id);
+bool Show(int owner, int id, bool shown);
+void Remove(int owner, int id);
+void Clear(int owner);
+
+// Where a point in the world is on screen, in widget units (those of window offsets and the mouse position).
+// False when it is behind the camera.
+bool Project(double x, double y, double z, double* sx, double* sy);
+
+// The camera: taking it looks through a camera of the plugin's, placed with SetCamera; releasing goes back to the
+// game's own view. One plugin at a time.
+bool TakeCamera(int owner);
+bool SetCamera(int owner, double x, double y, double z, double pitch, double yaw, double fov);
+void ReleaseCamera(int owner);
+bool HasCamera(int owner);
+
+}  // namespace draw

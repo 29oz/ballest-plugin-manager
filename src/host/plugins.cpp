@@ -1,3 +1,5 @@
+#include "draw.hpp"
+#include "hud.hpp"
 #include "plugins.hpp"
 
 #include <windows.h>
@@ -33,6 +35,7 @@ struct Plugin {
     std::vector<std::string> files;
     std::vector<std::string> dependencies;      // ids of plugins that must be running first ([meta] dependencies)
     int timeoutMs = 50;
+    std::vector<ULONGLONG> overruns;            // when its recent callbacks ran out of time (see Run)
     bool essential = false;
     std::string status = "not loaded";
     bool running = false, removed = false;
@@ -169,7 +172,14 @@ void Stop(Plugin& p, const std::string& why) {
     game::RequestCursor(index, false);
 }
 
-// Runs one callback within the plugin's time budget; an exception or overrun stops the plugin.
+// Overruns a plugin is let off: a callback that runs out of time is cut short, and the plugin keeps running unless it
+// has done so kOverrunsAllowed times already in the last kOverrunWindowMs (a one-off hitch, such as the game loading
+// something while the plugin runs, shouldn't cost it the session). Main is never let off: cut short, the plugin is
+// only half set up.
+constexpr size_t kOverrunsAllowed = 3;
+constexpr ULONGLONG kOverrunWindowMs = 60000;
+
+// Runs one callback within the plugin's time budget; an exception, or overrunning too often, stops the plugin.
 void Run(Plugin& p, asIScriptFunction* fn, const float* dt) {
     const int index = static_cast<int>(&p - gPlugins.data());
     struct Running {                    // which plugin is running, for Current() and for a fault's blame
@@ -193,8 +203,20 @@ void Run(Plugin& p, asIScriptFunction* fn, const float* dt) {
             return Stop(p, std::string("exception: ") + p.ctx->GetExceptionString() + " in " +
                                p.ctx->GetExceptionFunction()->GetDeclaration() + " line " +
                                std::to_string(p.ctx->GetExceptionLineNumber()));
-        case asEXECUTION_ABORTED:
-            return Stop(p, "stopped: exceeded its " + std::to_string(p.timeoutMs) + " ms budget");
+        case asEXECUTION_ABORTED: {
+            const ULONGLONG now = GetTickCount64();
+            std::erase_if(p.overruns, [now](ULONGLONG at) { return now - at > kOverrunWindowMs; });
+            const bool main = std::string(fn->GetName()) == "Main";
+            if (!main && p.overruns.size() < kOverrunsAllowed) {
+                p.overruns.push_back(now);
+                hostlog::Write("warn", p.id, std::string(fn->GetName()) + " exceeded its " + std::to_string(p.timeoutMs) +
+                                                 " ms budget and was cut short (" + std::to_string(p.overruns.size()) + " of " +
+                                                 std::to_string(kOverrunsAllowed) + " allowed a minute)");
+                return;
+            }
+            return Stop(p, "stopped: exceeded its " + std::to_string(p.timeoutMs) + " ms budget" +
+                               (main ? std::string("") : " " + std::to_string(kOverrunsAllowed + 1) + " times in a minute"));
+        }
         default:
             return Stop(p, "stopped: execution result " + std::to_string(r));
     }
@@ -412,6 +434,8 @@ void Release(size_t i) {
     game::RequestCursor(static_cast<int>(i), false);
     leaderboard::RemoveOwner(static_cast<int>(i));
     editor::RemoveOwner(static_cast<int>(i));
+    draw::RemoveOwner(static_cast<int>(i));
+    hud::RemoveOwner(static_cast<int>(i));
 }
 
 // Plugins that depend on `id` lose their scripts before it does (their imported functions point into its module),

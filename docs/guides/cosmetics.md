@@ -73,10 +73,9 @@ group <name> [spin=x|y|z] [speed=<degrees a second>] [travel] [on=<group>] [pivo
 
 - **Materials** come first. `plastic` and `metal` are solid colours (`rough` from 0, shiny, to 1, matte); `glow`
   lights up (`bright`); `glass` is the game's see-through glass, tinted with the colour (clear if none is given),
-  `opacity` from 0 (invisible) to 1. Clear glass shows in front of the stadium water like everything else. Tinted
-  glass can't: the game has no tintable glass that sorts with its water, so the water behind a tinted part is drawn
-  over it. Keep tinted glass low on a ball, where the track is usually behind it. Colours show as given: the game's own rim tint and concrete grain are turned
-  off.
+  `opacity` from 0 (invisible) to 1. Clear and tinted glass both show in front of the stadium water (host 0.14.0
+  and newer: the host moves the game's tinted glass into the water's drawing pass). Colours show as given: the
+  game's own rim tint and concrete grain are turned off.
 - **Groups** collect the parts after them. `spin` turns the group about an axis; `travel` keeps it level and turned
   the way the ball is going instead of rolling with the ball (a blade that stays upright, for example). Before the
   ball has moved, a travelling group faces away from the camera, and on the Customize page it faces the camera.

@@ -278,6 +278,16 @@ bool SimulateClick(const std::string& label) {
     return false;
 }
 
+double Height() {
+    // In the UI's units (as UI::ScreenSize), from the footer's own laid-out size; 0 without a footer on screen.
+    Obj footer = eng::Get(gFooter.footer);
+    if (!footer || !eng::Call(footer, "IsVisible").ReturnAs<uint8_t>(0)) return 0;
+    struct Vec2d {
+        double x, y;
+    };
+    return eng::Call(footer, "GetDesiredSize").ReturnAs<Vec2d>(Vec2d{0, 0}).y;
+}
+
 std::string Status() {
     std::string s = std::string("footer=") + (eng::Get(gFooter.footer) ? "live" : "none");
     for (auto& b : gButtons) s += " button[" + b->label + "]=" + (eng::Get(b->button) ? "placed" : "absent");

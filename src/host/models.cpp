@@ -3,8 +3,10 @@
 #include <algorithm>
 #include <array>
 #include <cctype>
+#include <chrono>
 #include <cmath>
 #include <cstdlib>
+#include <cstdio>
 #include <cstring>
 #include <sstream>
 
@@ -27,8 +29,9 @@ const wchar_t* kGlowMaterial = L"/Game/Art/Materials/Environment/Materials/Insta
 // field, so water behind it is drawn over it (reported: a clear ball vanished in front of water). Clear glass is
 // M_GlassV2, which is in the default pass with the water, so the two sort by distance. V2 can't be tinted (its
 // ColorGlass changes nothing, measured), and neither can any other glass of the game in that pass (measured:
-// M_GlassStylized, M_DiscCheckpointGlass, the snow globe's), so tinted glass stays M_Glass (read from the package:
-// ColorGlass, Opacity, Refraction), drawn behind water that is behind it.
+// M_GlassStylized, M_DiscCheckpointGlass, the snow globe's, the translucent light, the Vefects flat and the ball wake
+// materials), so tinted glass is M_Glass (read from the package: ColorGlass, Opacity, Refraction), moved into the
+// water's pass (GlassInWatersPass).
 const wchar_t* kClearGlassMaterial = L"/Game/Art/Materials/Masters/M_GlassV2.M_GlassV2";
 const wchar_t* kTintedGlassMaterial = L"/Game/Art/Materials/Masters/M_Glass.M_Glass";
 
@@ -452,12 +455,56 @@ bool Append(Obj mesh, const Part& part) {
     return eng::Invoke(lib, p);
 }
 
+// A material's pass is its TranslucencyPass (0 before depth of field, 1 after: M_Glass 0, M_Water_Base 1, read in
+// game), and the renderer reads it live (measured). So M_Glass is moved into the water's pass, where the two sort by
+// distance, and drawn after the water (TranslucentSortPriority, kGlassSortPriority). Measured over water from the top:
+// before, tinted glass vanished wherever water was behind it, even at full opacity; after, it shows at 25%. What was
+// already drawing with M_Glass keeps its old pass and isn't drawn at all (measured) until its render state is rebuilt,
+// so those are rebuilt (a visibility toggle: MarkRenderStateDirty isn't callable). The game reloads M_Glass with its
+// own setting when it's unloaded (measured: back to 0 after a map change), so this is checked each time glass is made.
+constexpr int32_t kGlassSortPriority = 1;
+
+void GlassInWatersPass(Obj glass) {
+    uint8_t pass = 1;
+    if (!glass || !eng::ReadBytes(glass, "TranslucencyPass", &pass, 1) || pass != 0) return;
+    const uint8_t after = 1;
+    eng::WriteBytes(glass, "TranslucencyPass", &after, 1);
+    const auto started = std::chrono::steady_clock::now();
+    Obj primitive = eng::FindClass("PrimitiveComponent");
+    std::vector<Obj> found;
+    eng::ForEachObject([&](Obj o) {
+        if (!eng::IsDefaultObject(o) && eng::IsA(o, primitive)) found.push_back(o);
+        return true;
+    });
+    int rebuilt = 0;
+    for (Obj c : found) {
+        bool visible = false;
+        if (!eng::ReadBool(c, "bVisible", &visible) || !visible) continue;
+        const Params count = eng::Call(c, "GetNumMaterials");
+        int32_t n = 0;
+        if (const uint8_t* r = count.Return()) std::memcpy(&n, r, 4);
+        bool uses = false;
+        for (int32_t i = 0; i < n && !uses; ++i) {
+            Obj m = eng::Call(c, "GetMaterial", i).ReturnObj();
+            uses = m && eng::Call(m, "GetBaseMaterial").ReturnObj() == glass;
+        }
+        if (!uses) continue;
+        eng::Call(c, "SetVisibility", uint8_t{0}, uint8_t{0});
+        eng::Call(c, "SetVisibility", uint8_t{1}, uint8_t{0});
+        ++rebuilt;
+    }
+    const auto took = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - started).count();
+    hostlog::Info("models: tinted glass moved into the water's pass; " + std::to_string(rebuilt) + " of " + std::to_string(found.size()) +
+                  " components redrawn in " + std::to_string(took) + " ms");
+}
+
 Obj MakeMaterial(const Material& m, Obj worldContext) {
     const wchar_t* path = m.finish == Finish::Glow    ? kGlowMaterial
                           : m.finish == Finish::Glass ? (m.tinted ? kTintedGlassMaterial : kClearGlassMaterial)
                                                       : kColourMaterial;
     Obj parent = cosmetics::LoadAsset(path);
     if (!parent) return nullptr;
+    if (path == kTintedGlassMaterial) GlassInWatersPass(parent);
     const Params made = eng::Call(Lib("KismetMaterialLibrary"), "CreateDynamicMaterialInstance", worldContext, parent,
                                   std::array<uint8_t, 8>{}, uint8_t{0});
     Obj mid = made.ReturnObj();
@@ -558,6 +605,7 @@ Built Build(const Model& model, Obj parent) {
         }
         for (size_t i = 0; i < materials.size(); ++i)
             if (materials[i]) eng::Call(component, "SetMaterial", static_cast<int32_t>(i), materials[i]);
+        eng::Call(component, "SetTranslucentSortPriority", kGlassSortPriority);   // glass after the water
         eng::Call(component, "SetCollisionEnabled", uint8_t{0});     // never touches the ball's physics
         const uint8_t snap = 2;                                       // EAttachmentRule::SnapToTarget
         Obj on = parent;                                              // the ball, or the group it is built on
@@ -659,6 +707,205 @@ void Destroy(Built& built) {
     for (const auto& a : built.actors)
         if (Obj actor = eng::Get(a)) eng::Call(actor, "K2_DestroyActor");
     built.actors.clear();
+}
+
+namespace {
+// An engine-allocated array of FVector (three doubles each), for the sweep's path: allocated the way Points does it.
+ArrayHeader Vectors(const std::vector<std::array<double, 3>>& points) {
+    const int n = static_cast<int>(points.size());
+    const std::wstring empty;
+    // LeftPad to 12n - 1 characters: 24n bytes with the terminator, room for n vectors.
+    const eng::FString s{empty.c_str(), 1, 1};
+    const Params p = eng::Call(Lib("KismetStringLibrary"), "LeftPad", s, static_cast<int32_t>(12 * n - 1));
+    ArrayHeader a{nullptr, 0, 0};
+    size_t size = 0;
+    const uint8_t* r = p.Return(&size);
+    if (!r || size != 16) return a;
+    std::memcpy(&a.data, r, sizeof a.data);
+    if (!a.data) return a;
+    std::memcpy(a.data, points.data(), points.size() * sizeof points[0]);
+    a.num = a.max = n;
+    return a;
+}
+
+Obj Coloured(Obj actor, const Colour& c) {
+    Obj component = actor ? eng::ReadObj(actor, "DynamicMeshComponent") : nullptr;
+    if (!component) return nullptr;
+    Material m;
+    m.finish = c.opacity < 1 ? Finish::Glass : c.glow ? Finish::Glow : Finish::Plastic;
+    m.tinted = c.opacity < 1;
+    m.opacity = c.opacity;
+    m.r = c.r;
+    m.g = c.g;
+    m.b = c.b;
+    m.bright = c.bright;
+    m.rough = 0.4f;
+    if (Obj material = MakeMaterial(m, game::PlayerController())) eng::Call(component, "SetMaterial", int32_t{0}, material);
+    eng::Call(component, "SetCollisionEnabled", uint8_t{0});
+    eng::Call(component, "SetCastShadow", uint8_t{0});
+    eng::Call(component, "SetTranslucentSortPriority", kGlassSortPriority);       // glass after the water
+    return actor;
+}
+}  // namespace
+
+// Its dynamic material (MakeMaterial's, on the mesh's first slot): the glow material's Light_Color and
+// Light_Emissive_Intensity, as MakeMaterial sets them.
+Obj NewGlowMaterial(float r, float g, float b, float bright) {
+    Material m;
+    m.finish = Finish::Glow;
+    m.r = r;
+    m.g = g;
+    m.b = b;
+    m.bright = bright;
+    return MakeMaterial(m, game::PlayerController());
+}
+
+Obj GlowMaterial(Obj actor) {
+    Obj component = actor ? eng::ReadObj(actor, "DynamicMeshComponent") : nullptr;
+    return component ? eng::Call(component, "GetMaterial", int32_t{0}).ReturnObj() : nullptr;
+}
+
+bool SetGlow(Obj mid, float r, float g, float b, float bright) {
+    if (!mid) return false;
+    auto name = [](const char* text, uint8_t out[8]) {
+        const std::wstring wide = eng::Widen(text);
+        const Params made = eng::Call(Lib("KismetStringLibrary"), "Conv_StringToName",
+                                      eng::FString{wide.c_str(), static_cast<int32_t>(wide.size() + 1), static_cast<int32_t>(wide.size() + 1)});
+        if (const uint8_t* n = made.Return()) std::memcpy(out, n, 8);
+    };
+    static uint8_t colourName[8] = {}, brightName[8] = {};
+    static bool named = false;
+    if (!named) {
+        name("Light_Color", colourName);
+        name("Light_Emissive_Intensity", brightName);
+        named = true;
+    }
+    Params colour(eng::FunctionOn(mid, "SetVectorParameterValue"));
+    const float value[4] = {r, g, b, 1};
+    colour.Set("ParameterName", colourName, 8);
+    colour.Set("Value", value);
+    Params intensity(eng::FunctionOn(mid, "SetScalarParameterValue"));
+    intensity.Set("ParameterName", brightName, 8);
+    intensity.Set("Value", bright);
+    return eng::Invoke(mid, colour) && eng::Invoke(mid, intensity);
+}
+
+// The path a tube is swept along, without what makes the sweep throw a spike across the whole track: points closer
+// than the tube is wide, and points where it doubles back past 120 degrees (the swept corner has nowhere to go).
+// Measured: one run's trail on S1 Track 01 (a ball jittering on the spot) had 72 steps under 2 cm and 18 full reversals,
+// and drew two straight lines through the start and finish; its data was fine.
+std::vector<std::array<double, 3>> SweepablePath(const std::vector<std::array<double, 3>>& in, double radius) {
+    auto gap = [](const std::array<double, 3>& a, const std::array<double, 3>& b) {
+        const double x = a[0] - b[0], y = a[1] - b[1], z = a[2] - b[2];
+        return std::sqrt(x * x + y * y + z * z);
+    };
+    const double spacing = std::max(2.0, radius);
+    std::vector<std::array<double, 3>> path;
+    for (size_t k = 0; k < in.size(); ++k) {
+        if (!path.empty() && gap(in[k], path.back()) < spacing) {
+            if (k + 1 == in.size() && path.size() > 1) path.back() = in[k];     // the end stays the end
+            continue;
+        }
+        path.push_back(in[k]);
+    }
+    for (bool removed = true; removed && path.size() > 2;) {
+        removed = false;
+        std::vector<std::array<double, 3>> kept{path[0]};
+        for (size_t k = 1; k + 1 < path.size(); ++k) {
+            const auto& a = kept.back();
+            const auto& b = path[k];
+            const auto& c = path[k + 1];
+            const double ax = b[0] - a[0], ay = b[1] - a[1], az = b[2] - a[2], bx = c[0] - b[0], by = c[1] - b[1], bz = c[2] - b[2];
+            const double la = std::sqrt(ax * ax + ay * ay + az * az), lb = std::sqrt(bx * bx + by * by + bz * bz);
+            if (la > 0 && lb > 0 && (ax * bx + ay * by + az * bz) / (la * lb) < -0.5) {
+                removed = true;
+                continue;
+            }
+            kept.push_back(b);
+        }
+        kept.push_back(path.back());
+        path.swap(kept);
+    }
+    return path;
+}
+
+bool AppendTube(Obj actor, const std::vector<std::array<double, 3>>& raw, double radius, int sides) {
+    Obj component = actor ? eng::ReadObj(actor, "DynamicMeshComponent") : nullptr;
+    Obj mesh = component ? eng::Call(component, "GetDynamicMesh").ReturnObj() : nullptr;
+    const std::vector<std::array<double, 3>> path = SweepablePath(raw, radius);
+    if (!mesh || path.size() < 2) return false;
+    // A circle of `sides` swept along the points (Geometry Script's AppendSimpleSweptPolygon works out each point's
+    // frame itself).
+    std::vector<std::pair<double, double>> circle;
+    for (int i = 0; i < sides; ++i) {
+        const double a = 2 * kPi * i / sides;
+        circle.push_back({radius * std::cos(a), radius * std::sin(a)});
+    }
+    Obj lib = Lib("GeometryScriptLibrary_MeshPrimitiveFunctions");
+    Params p(eng::FindFunction(eng::ClassOf(lib), "AppendSimpleSweptPolygon"));
+    const double zero[3] = {0, 0, 0}, one[3] = {1, 1, 1};
+    p.Set("TargetMesh", mesh);
+    p.Set("PrimitiveOptions", Options{});
+    p.Set("Transform", MakeTransform(zero, zero, one));
+    p.Set("PolygonVertices", Points(circle));
+    p.Set("SweepPath", Vectors(path));
+    p.Set("bLoop", uint8_t{0});
+    p.Set("bCapped", uint8_t{1});
+    p.Set("StartScale", 1.0f);
+    p.Set("EndScale", 1.0f);
+    p.Set("RotationAngleDeg", 0.0f);
+    p.Set("MiterLimit", 1.0f);
+    return eng::Invoke(lib, p);
+}
+
+bool SetOpacity(Obj mid, float opacity) {
+    if (!mid) return false;
+    static uint8_t opacityName[8] = {};
+    static bool named = false;
+    if (!named) {
+        const std::wstring wide = L"Opacity";
+        const Params made = eng::Call(Lib("KismetStringLibrary"), "Conv_StringToName",
+                                      eng::FString{wide.c_str(), static_cast<int32_t>(wide.size() + 1), static_cast<int32_t>(wide.size() + 1)});
+        if (const uint8_t* n = made.Return()) std::memcpy(opacityName, n, 8);
+        named = true;
+    }
+    Params p(eng::FunctionOn(mid, "SetScalarParameterValue"));
+    p.Set("ParameterName", opacityName, 8);
+    p.Set("Value", opacity);
+    return eng::Invoke(mid, p);
+}
+
+Obj SpawnMesh(const Colour& colour) {
+    Obj controller = game::PlayerController();
+    Obj actor = controller ? SpawnMeshActor(controller) : nullptr;
+    return actor ? Coloured(actor, colour) : nullptr;
+}
+
+Obj SpawnTube(const std::vector<std::array<double, 3>>& path, double radius, const Colour& colour) {
+    if (path.size() < 2) return nullptr;
+    Obj actor = SpawnMesh(colour);
+    if (!actor) return nullptr;
+    if (!AppendTube(actor, path, radius, 6)) {
+        eng::Call(actor, "K2_DestroyActor");
+        return nullptr;
+    }
+    return actor;
+}
+
+Obj SpawnBall(double radius, const Colour& colour) {
+    Obj controller = game::PlayerController();
+    Obj actor = controller ? SpawnMeshActor(controller) : nullptr;
+    Obj component = actor ? eng::ReadObj(actor, "DynamicMeshComponent") : nullptr;
+    Obj mesh = component ? eng::Call(component, "GetDynamicMesh").ReturnObj() : nullptr;
+    if (!mesh) {
+        if (actor) eng::Call(actor, "K2_DestroyActor");
+        return nullptr;
+    }
+    Part ball{};
+    ball.shape = Shape::Sphere;
+    ball.r = radius;
+    Append(mesh, ball);
+    return Coloured(actor, colour);
 }
 
 }  // namespace models

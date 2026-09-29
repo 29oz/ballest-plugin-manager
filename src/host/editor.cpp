@@ -10,6 +10,7 @@
 #include <map>
 #include <set>
 #include <string>
+#include <vector>
 
 #include "cosmetics.hpp"
 #include "game.hpp"
@@ -1037,17 +1038,41 @@ std::string MapName() {
 }
 
 // A text box of the game has keyboard focus (the map name, a transform box, a search): keys are being typed.
+// Whether one of the game's text boxes has the keyboard. Finding them means going through every object (measured:
+// scanning all ~80,000 four times on each call cost a plugin that asks every frame 8-19 ms a frame), so the boxes are
+// found once and then again at most every 2 seconds (or in a new map), and each call only asks those; the answer is
+// kept for 4 ms (the rest of the frame).
 bool Typing() {
-    bool typing = false;
-    for (const char* className : {"EditableText", "EditableTextBox", "MultiLineEditableText", "MultiLineEditableTextBox"}) {
-        Obj cls = eng::FindClass(className);
-        if (!cls) continue;
+    static std::vector<eng::Weak> boxes;
+    static double scanned = -100, askedAt = -1;
+    static int scannedGeneration = -1;
+    static bool typing = false;
+    const double now = game::Seconds();
+    if (now - askedAt < 0.004) return typing;       // asked again within the frame
+    askedAt = now;
+    if (now - scanned > 2 || scannedGeneration != game::Generation()) {
+        scanned = now;
+        scannedGeneration = game::Generation();
+        boxes.clear();
+        Obj classes[4] = {eng::FindClass("EditableText"), eng::FindClass("EditableTextBox"), eng::FindClass("MultiLineEditableText"),
+                          eng::FindClass("MultiLineEditableTextBox")};
         eng::ForEachObject([&](Obj o) {
-            if (eng::ClassOf(o) == cls && !eng::IsDefaultObject(o) && eng::Call(o, "HasKeyboardFocus").ReturnBool()) typing = true;
-            return !typing;
+            Obj cls = eng::ClassOf(o);
+            for (Obj c : classes)
+                if (c && cls == c && !eng::IsDefaultObject(o)) {
+                    boxes.push_back(eng::MakeWeak(o));
+                    break;
+                }
+            return true;
         });
-        if (typing) break;
     }
+    typing = false;
+    for (const auto& weak : boxes)
+        if (Obj box = eng::Get(weak))
+            if (eng::Call(box, "HasKeyboardFocus").ReturnBool()) {
+                typing = true;
+                break;
+            }
     return typing;
 }
 

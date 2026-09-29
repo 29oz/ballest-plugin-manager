@@ -3,6 +3,8 @@
 // registered as asOBJ_NOCOUNT: the host owns them for the plugin's lifetime and scripts cannot delete them.
 #include "api.hpp"
 
+#include <cmath>
+#include <cstdlib>
 #include <windows.h>
 
 #include <angelscript.h>
@@ -13,6 +15,9 @@
 #include <utility>
 
 #include "cosmetics.hpp"
+#include "draw.hpp"
+#include "ghosts.hpp"
+#include "tracks.hpp"
 #include "game.hpp"
 #include "hud.hpp"
 #include "input.hpp"
@@ -124,9 +129,11 @@ std::string SettingKind(unsigned i) {
 std::string SettingGet(unsigned i) { return settings::Get(i); }
 bool SettingIsDefault(unsigned i) { return settings::IsDefault(i); }
 // Changing another plugin's settings is for the plugin manager; a plugin changes its own by assigning the variable.
-bool SettingSet(unsigned i, const std::string& value) { return MayManage() && settings::Set(i, value); }
+// The plugin manager sets anyone's; a plugin its own (a settings panel of its own, as the ghost viewer's).
+bool MaySet(unsigned i) { return MayManage() || (i < settings::List().size() && settings::List()[i].plugin == plugins::Current()); }
+bool SettingSet(unsigned i, const std::string& value) { return MaySet(i) && settings::Set(i, value); }
 void SettingReset(unsigned i) {
-    if (MayManage()) settings::Reset(i);
+    if (MaySet(i)) settings::Reset(i);
 }
 
 // --- Registry ------------------------------------------------------------------------------------------------------
@@ -174,6 +181,14 @@ bool PanelGetVisible(ui::Panel* p) { return p->visible; }
 void PanelSetVisible(ui::Panel* p, bool v) { p->visible = v; }
 ui::FooterButton* PanelAddButton(ui::Panel* p, const std::string& s) { return ui::AddPanelButton(p, s); }
 void SetCursorVisible(bool v) { game::RequestCursor(plugins::Current(), v); }
+float UiFooterHeight() { return static_cast<float>(ui::footer::Height()); }
+bool UiScreenSize(float& width, float& height) {
+    double w = 0, h = 0;
+    if (!game::ScreenSize(&w, &h)) return false;
+    width = static_cast<float>(w);
+    height = static_cast<float>(h);
+    return true;
+}
 
 // --- UI: windows ---------------------------------------------------------------------------------------------------
 ui::Window* NewWindow() { return ui::MakeWindow(plugins::Current()); }
@@ -192,6 +207,10 @@ void WinOffset(ui::Window* w, float x, float y) {
     w->offsetY = y;
     w->layoutDirty = true;
 }
+void WinCornerRadius(ui::Window* w, float radius) {
+    w->cornerRadius = radius < 0 ? 0 : radius;
+    w->layoutDirty = true;
+}
 void WinBackground(ui::Window* w, float r, float g, float b, float a) {
     w->background = {r, g, b, a};
     w->layoutDirty = true;
@@ -199,6 +218,19 @@ void WinBackground(ui::Window* w, float r, float g, float b, float a) {
 bool WinGetVisible(ui::Window* w) { return w->visible; }
 void WinSetVisible(ui::Window* w, bool v) { w->visible = v; }
 ui::Widget* WinText(ui::Window* w, const std::string& s, float size) { return ui::AddWidget(w, ui::Kind::Text, s, size); }
+ui::Widget* WinTextAt(ui::Window* w, const std::string& s, float size, float x, float y) {
+    return ui::AddPlaced(w, ui::Kind::Text, s, size, x, y, 0, 0);
+}
+ui::Widget* WinRectAt(ui::Window* w, float x, float y, float width, float height) {
+    return ui::AddPlaced(w, ui::Kind::Rect, "", 0, x, y, width, height);
+}
+void PlacedMove(ui::Widget* item, float x, float y) { ui::Place(item, x, y, item->pw, item->ph); }
+void RectPlace(ui::Widget* item, float x, float y, float width, float height) { ui::Place(item, x, y, width, height); }
+void RectColor(ui::Widget* item, float r, float g, float b, float a) {
+    if (item->color.r == r && item->color.g == g && item->color.b == b && item->color.a == a) return;
+    item->color = {r, g, b, a};
+    item->colorDirty = true;
+}
 ui::Widget* WinButton(ui::Window* w, const std::string& s) { return ui::AddWidget(w, ui::Kind::Button, s, 0); }
 ui::Widget* WinIconButton(ui::Window* w, const std::string& icon) { return ui::AddWidget(w, ui::Kind::IconButton, icon, 0); }
 ui::Widget* WinSlider(ui::Window* w, float width) { return ui::AddWidget(w, ui::Kind::Slider, "", width); }
@@ -290,6 +322,7 @@ void SliderSet(ui::Widget* w, float v) {
 }
 bool SliderDragging(ui::Widget* w) { return w->dragging; }
 void DropdownAdd(ui::Widget* w, const std::string& s) { ui::AddOption(w, s); }
+void DropdownClear(ui::Widget* w) { ui::ClearOptions(w); }
 int DropdownGet(ui::Widget* w) { return w->selected; }
 void DropdownSet(ui::Widget* w, int i) {
     if (i >= 0 && i < static_cast<int>(w->options.size())) w->selected = i;
@@ -375,6 +408,7 @@ bool EditorScreenPosition(int id, float& x, float& y) {
     y = static_cast<float>(sy);
     return ok;
 }
+float InputWheel() { return static_cast<float>(game::MouseWheel()); }
 bool InputMousePosition(float& x, float& y) {
     double mx = 0, my = 0;
     const bool ok = game::MousePosition(&mx, &my);
@@ -433,6 +467,21 @@ void RegisterCore() {
     RegisterScriptArray(e, true);
     RegisterStdString(e);
     RegisterStdStringUtils(e);          // string.split, join (needs the array type)
+    // Math, with the names of AngelScript's own math add-on (in doubles).
+    e->SetDefaultNamespace("Math");
+    Global("double sin(double)", asFUNCTIONPR(std::sin, (double), double));
+    Global("double cos(double)", asFUNCTIONPR(std::cos, (double), double));
+    Global("double tan(double)", asFUNCTIONPR(std::tan, (double), double));
+    Global("double asin(double)", asFUNCTIONPR(std::asin, (double), double));
+    Global("double acos(double)", asFUNCTIONPR(std::acos, (double), double));
+    Global("double atan(double)", asFUNCTIONPR(std::atan, (double), double));
+    Global("double atan2(double, double)", asFUNCTIONPR(std::atan2, (double, double), double));
+    Global("double sqrt(double)", asFUNCTIONPR(std::sqrt, (double), double));
+    Global("double pow(double, double)", asFUNCTIONPR(std::pow, (double, double), double));
+    Global("double abs(double)", asFUNCTIONPR(std::fabs, (double), double));
+    Global("double floor(double)", asFUNCTIONPR(std::floor, (double), double));
+    Global("double ceil(double)", asFUNCTIONPR(std::ceil, (double), double));
+    e->SetDefaultNamespace("");
     e->SetDefaultNamespace("Log");
     Global("void Info(const string &in)", asFUNCTION(LogInfo));
     Global("void Warn(const string &in)", asFUNCTION(LogWarn));
@@ -443,6 +492,7 @@ void RegisterCore() {
     e->SetDefaultNamespace("Host");
     Global("string Version()", asFUNCTION(HostVersion));
     Global("double Time()", asFUNCTION(HostTime));
+    Global("int MapNumber()", asFUNCTION(game::Generation));
     Global("void OpenUrl(const string &in)", asFUNCTION(OpenUrl));
 
     e->SetDefaultNamespace("Plugins");
@@ -506,9 +556,11 @@ void RegisterCore() {
 
 void RegisterUi() {
     e->SetDefaultNamespace("UI");
-    for (const char* type : {"FooterButton", "Panel", "Window", "Text", "Button", "Slider", "Dropdown", "TextArea", "TextInput", "Image", "CheckBox"})
+    for (const char* type : {"FooterButton", "Panel", "Window", "Text", "Button", "Slider", "Dropdown", "TextArea", "TextInput", "Image", "CheckBox", "Rect"})
         Check(e->RegisterObjectType(type, 0, asOBJ_REF | asOBJ_NOCOUNT), type);
     Global("void SetCursorVisible(bool)", asFUNCTION(SetCursorVisible));
+    Global("bool ScreenSize(float &out, float &out)", asFUNCTION(UiScreenSize));
+    Global("float FooterHeight()", asFUNCTION(UiFooterHeight));
     Global("bool CursorShown()", asFUNCTION(game::CursorShown));
     Global("void ResetPositions(const string &in pluginId)", asFUNCTION(ui::ResetPositions));
     Global("bool HasMovable(const string &in pluginId)", asFUNCTION(ui::HasMovable));
@@ -531,9 +583,12 @@ void RegisterUi() {
     Method("Window", "void SetPivot(float, float)", asFUNCTION(WinPivot));
     Method("Window", "void SetOffset(float, float)", asFUNCTION(WinOffset));
     Method("Window", "void SetBackground(float, float, float, float)", asFUNCTION(WinBackground));
+    Method("Window", "void SetCornerRadius(float)", asFUNCTION(WinCornerRadius));
     Method("Window", "bool get_visible() property", asFUNCTION(WinGetVisible));
     Method("Window", "void set_visible(bool) property", asFUNCTION(WinSetVisible));
     Method("Window", "Text@ AddText(const string &in, float size = 16)", asFUNCTION(WinText));
+    Method("Window", "Text@ AddTextAt(const string &in, float size, float x, float y)", asFUNCTION(WinTextAt));
+    Method("Window", "Rect@ AddRect(float x, float y, float width, float height)", asFUNCTION(WinRectAt));
     Method("Window", "Button@ AddButton(const string &in)", asFUNCTION(WinButton));
     Method("Window", "Button@ AddIconButton(const string &in)", asFUNCTION(WinIconButton));
     Method("Window", "Slider@ AddSlider(float)", asFUNCTION(WinSlider));
@@ -566,7 +621,10 @@ void RegisterUi() {
     Method("Text", "void set_text(const string &in) property", asFUNCTION(SetWidgetText));
     Method("Text", "string get_text() property", asFUNCTION(GetWidgetText));
     Method("Text", "void SetColor(float, float, float, float)", asFUNCTION(TextColor));
-    for (const char* type : {"Text", "Button", "Slider", "Dropdown", "TextArea", "TextInput", "Image"}) {
+    Method("Text", "void SetPosition(float, float)", asFUNCTION(PlacedMove));
+    Method("Rect", "void SetRect(float x, float y, float width, float height)", asFUNCTION(RectPlace));
+    Method("Rect", "void SetColor(float, float, float, float)", asFUNCTION(RectColor));
+    for (const char* type : {"Text", "Button", "Slider", "Dropdown", "TextArea", "TextInput", "Image", "Rect"}) {
         Method(type, "void set_visible(bool) property", asFUNCTION(SetWidgetVisible));
         Method(type, "bool get_visible() property", asFUNCTION(GetWidgetVisible));
     }
@@ -583,6 +641,7 @@ void RegisterUi() {
     Method("Slider", "void set_value(float) property", asFUNCTION(SliderSet));
     Method("Slider", "bool get_dragging() property", asFUNCTION(SliderDragging));
     Method("Dropdown", "void AddOption(const string &in)", asFUNCTION(DropdownAdd));
+    Method("Dropdown", "void ClearOptions()", asFUNCTION(DropdownClear));
     Method("Dropdown", "int get_selected() property", asFUNCTION(DropdownGet));
     Method("Dropdown", "void set_selected(int) property", asFUNCTION(DropdownSet));
     Method("Dropdown", "bool Changed()", asFUNCTION(DropdownChanged));
@@ -611,7 +670,7 @@ void RegisterUi() {
 const std::vector<std::pair<std::string, int>>& KeyNames() {
     static std::vector<std::pair<std::string, int>> names;
     if (!names.empty()) return names;
-    names = {{"Space", 0x20}, {"Enter", 0x0D}, {"Escape", 0x1B}, {"Tab", 0x09}, {"Shift", 0x10}, {"Ctrl", 0x11}, {"Alt", 0x12},
+    names = {{"Space", 0x20}, {"Enter", 0x0D}, {"Escape", 0x1B}, {"Tab", 0x09}, {"Shift", 0x10}, {"Ctrl", 0x11}, {"Alt", 0x12}, {"Win", 0x5B}, {"RightWin", 0x5C},
              {"Left", 0x25}, {"Up", 0x26}, {"Right", 0x27}, {"Down", 0x28}, {"MouseLeft", 0x01}, {"MouseRight", 0x02},
              {"MouseMiddle", 0x04}, {"MouseBack", 0x05}, {"MouseForward", 0x06}, {"Backspace", 0x08}, {"PageUp", 0x21},
              {"PageDown", 0x22}, {"End", 0x23}, {"Home", 0x24}, {"Insert", 0x2D}, {"Delete", 0x2E}, {"Minus", 0xBD},
@@ -646,6 +705,7 @@ void RegisterInput() {
     Global("bool Pressed(Key)", asFUNCTION(KeyPressed));
     Global("bool Down(Key)", asFUNCTION(KeyDown));
     Global("bool MousePosition(float &out, float &out)", asFUNCTION(InputMousePosition));
+    Global("float Wheel()", asFUNCTION(InputWheel));
     Global("Key AnyPressed()", asFUNCTION(AnyKeyPressed));
     Global("string Name(Key)", asFUNCTION(KeyName));
 }
@@ -661,6 +721,7 @@ bool RaceSetPaused(bool paused) {
     return race::SetPaused(paused);
 }
 bool RacePaused() { return race::Paused(); }
+void RaceHideBall(bool hidden) { hud::HideBall(plugins::Current(), hidden); }
 std::string RaceSaveBall() {
     plugins::GameWork work;
     return race::SaveBall();
@@ -720,7 +781,10 @@ void RegisterRace() {
     Global("bool LoadBall(const string &in, bool momentum = true)", asFUNCTION(RaceLoadBall));
     Global("void StartPractice()", asFUNCTION(RaceStartPractice));
     Global("bool IsPractice()", asFUNCTION(race::Practice));
+    Global("void HideBall(bool)", asFUNCTION(RaceHideBall));
 }
+
+void HudHideGame(bool hidden) { hud::HideGame(plugins::Current(), hidden); }
 
 void RegisterHud() {
     e->SetDefaultNamespace("Hud");
@@ -739,6 +803,7 @@ void RegisterHud() {
     Global("void SetBlink(const string &in)", asFUNCTION(HudSetBlink));
     Global("bool SetPartColor(const string &in, const string &in, float, float, float, float)", asFUNCTION(HudSetPartColor));
     Global("void ResetPartColor(const string &in, const string &in)", asFUNCTION(HudResetPartColor));
+    Global("void HideGame(bool)", asFUNCTION(HudHideGame));
 }
 
 void RegisterEditor() {
@@ -863,6 +928,250 @@ void RegisterCosmetics() {
     Global("string Equipped(Kind)", asFUNCTION(CosmeticsEquipped));
 }
 
+// --- ghosts, drawing and the camera -------------------------------------------------------------------------------
+const ghosts::Ghost* GhostAt(int i) {
+    const auto& all = ghosts::All();
+    return i >= 0 && static_cast<size_t>(i) < all.size() ? &all[static_cast<size_t>(i)] : nullptr;
+}
+bool GhostsLoad(const std::string& leaderboard, int count) { return ghosts::Load(leaderboard, count); }
+int GhostsPlayerBall(int i) {
+    plugins::GameWork work;
+    return i < 0 ? 0 : ghosts::PlayerBall(plugins::Current(), static_cast<size_t>(i));
+}
+bool GhostsBallName(int id, bool shown) { return ghosts::ShowPlayerName(plugins::Current(), id, shown); }
+template <typename T>
+std::vector<T> VectorOf(const CScriptArray* a) {
+    std::vector<T> out;
+    if (a)
+        for (asUINT i = 0; i < a->GetSize(); ++i) out.push_back(*static_cast<const T*>(a->At(i)));
+    return out;
+}
+int GhostsCrowdCreate(double radius, const CScriptArray* palette) {
+    plugins::GameWork work;
+    return ghosts::CrowdCreate(plugins::Current(), radius, VectorOf<float>(palette));
+}
+bool GhostsCrowdMembers(int id, const CScriptArray* ghostsIn, const CScriptArray* groups) {
+    plugins::GameWork work;
+    return ghosts::CrowdMembers(plugins::Current(), id, VectorOf<int>(ghostsIn), VectorOf<int>(groups));
+}
+bool GhostsCrowdSkins(int id) { return ghosts::CrowdSkins(plugins::Current(), id); }
+bool GhostsCrowdTrails(int id, double radius, float opacity, double chunk) { return ghosts::CrowdTrails(plugins::Current(), id, radius, opacity, chunk); }
+bool GhostsCrowdTrailsUpTo(int id, double t) { return ghosts::CrowdTrailsUpTo(plugins::Current(), id, t); }
+bool GhostsCrowdShowTrails(int id, bool shown) { return ghosts::CrowdShowTrails(plugins::Current(), id, shown); }
+bool GhostsCrowdTimes(int id, const CScriptArray* offsets, const CScriptArray* shown) {
+    return ghosts::CrowdTimes(plugins::Current(), id, VectorOf<double>(offsets), VectorOf<bool>(shown));
+}
+bool GhostsCrowdPlace(int id, double t) {
+    plugins::GameWork work;
+    return ghosts::CrowdPlace(plugins::Current(), id, t);
+}
+bool GhostsPlaceBall(int id, int i, double t) { return i >= 0 && ghosts::PlacePlayerBall(plugins::Current(), id, static_cast<size_t>(i), t); }
+bool DrawGlow(int id, float r, float g, float b, float bright) { return draw::Glow(plugins::Current(), id, r, g, b, bright); }
+bool DrawFade(int id, float opacity) { return draw::Fade(plugins::Current(), id, opacity); }
+bool GhostsView(int i, double t, double& x, double& y, double& z, double& pitch, double& yaw, double& fov) {
+    plugins::GameWork work;
+    double out[6];
+    if (i < 0 || !ghosts::View(static_cast<size_t>(i), t, out)) return false;
+    x = out[0];
+    y = out[1];
+    z = out[2];
+    pitch = out[3];
+    yaw = out[4];
+    fov = out[5];
+    return true;
+}
+std::string GhostsState() { return ghosts::State(); }
+std::string GhostsLeaderboard() { return ghosts::Leaderboard(); }
+int GhostsEntries() { return ghosts::Entries(); }
+int GhostsWithoutReplay() { return ghosts::WithoutReplay(); }
+int GhostsCount() { return static_cast<int>(ghosts::All().size()); }
+std::string GhostName(int i) { const auto* g = GhostAt(i); return g ? g->replay.name : ""; }
+int GhostRank(int i) { const auto* g = GhostAt(i); return g ? g->rank : 0; }
+double GhostTime(int i) { const auto* g = GhostAt(i); return g ? g->replay.time : 0; }
+bool GhostIsOwn(int i) { const auto* g = GhostAt(i); return g && g->own; }
+int GhostSampleCount(int i) { const auto* g = GhostAt(i); return g ? static_cast<int>(g->replay.samples.size()) : 0; }
+bool GhostSample(int i, int j, double& t, double& x, double& y, double& z) {
+    const auto* g = GhostAt(i);
+    if (!g || j < 0 || static_cast<size_t>(j) >= g->replay.samples.size()) return false;
+    const auto& s = g->replay.samples[static_cast<size_t>(j)];
+    t = s.t;
+    x = s.at.x;
+    y = s.at.y;
+    z = s.at.z;
+    return true;
+}
+bool GhostPosition(int i, double t, double& x, double& y, double& z) {
+    const auto* g = GhostAt(i);
+    if (!g) return false;
+    const auto p = ghostdata::At(g->replay, t);
+    x = p.x;
+    y = p.y;
+    z = p.z;
+    return true;
+}
+CScriptArray* DoubleArray(const std::vector<double>& values) {
+    CScriptArray* array = CScriptArray::Create(e->GetTypeInfoByDecl("array<double>"), static_cast<asUINT>(values.size()));
+    for (asUINT k = 0; k < values.size(); ++k) *static_cast<double*>(array->At(k)) = values[k];
+    return array;
+}
+CScriptArray* GhostSplits(int i) { const auto* g = GhostAt(i); return DoubleArray(g ? g->replay.splits : std::vector<double>{}); }
+CScriptArray* GhostOrder(int i) { return IdArray(i >= 0 ? ghosts::Order(static_cast<size_t>(i)) : std::vector<int>{}); }
+int GhostsCheckpointCount() { return static_cast<int>(ghosts::Checkpoints().size()); }
+bool GhostsCheckpoint(int k, int& number, double& x, double& y, double& z) {
+    const auto all = ghosts::Checkpoints();
+    if (k < 0 || static_cast<size_t>(k) >= all.size()) return false;
+    const auto& c = all[static_cast<size_t>(k)];
+    number = c.number;
+    x = c.at.x;
+    y = c.at.y;
+    z = c.at.z;
+    return true;
+}
+
+std::vector<std::array<double, 3>> PathOf(const CScriptArray* xyz) {
+    std::vector<std::array<double, 3>> path;
+    if (!xyz) return path;
+    for (asUINT k = 0; k + 2 < xyz->GetSize(); k += 3)
+        path.push_back({*static_cast<const double*>(xyz->At(k)), *static_cast<const double*>(xyz->At(k + 1)), *static_cast<const double*>(xyz->At(k + 2))});
+    return path;
+}
+int DrawTube(const CScriptArray* xyz, double radius, float r, float g, float b, bool glow, float opacity) {
+    plugins::GameWork work;
+    return draw::Tube(plugins::Current(), PathOf(xyz), radius, r, g, b, glow, opacity < 0 ? 0 : opacity);
+}
+int DrawBall(double radius, float r, float g, float b, bool glow) {
+    plugins::GameWork work;
+    return draw::Ball(plugins::Current(), radius, r, g, b, glow);
+}
+bool DrawMove(int id, double x, double y, double z) { return draw::Move(plugins::Current(), id, x, y, z); }
+bool DrawShow(int id, bool shown) { return draw::Show(plugins::Current(), id, shown); }
+void DrawRemove(int id) { draw::Remove(plugins::Current(), id); }
+void DrawClear() { draw::Clear(plugins::Current()); }
+bool CameraProject(double x, double y, double z, float& sx, float& sy) {
+    double a = 0, b = 0;
+    const bool ok = draw::Project(x, y, z, &a, &b);
+    sx = static_cast<float>(a);
+    sy = static_cast<float>(b);
+    return ok;
+}
+bool CameraTake() { return draw::TakeCamera(plugins::Current()); }
+bool CameraSet(double x, double y, double z, double pitch, double yaw, double fov) {
+    return draw::SetCamera(plugins::Current(), x, y, z, pitch, yaw, fov);
+}
+void CameraRelease() { draw::ReleaseCamera(plugins::Current()); }
+bool CameraHas() { return draw::HasCamera(plugins::Current()); }
+
+CScriptArray* StringArrayOf(const std::vector<std::string>& values) {
+    CScriptArray* array = CScriptArray::Create(e->GetTypeInfoByDecl("array<string>"), static_cast<asUINT>(values.size()));
+    for (asUINT k = 0; k < values.size(); ++k) *static_cast<std::string*>(array->At(k)) = values[k];
+    return array;
+}
+CScriptArray* TracksOfficial() {
+    plugins::GameWork work;
+    std::vector<std::string> levels;
+    for (const auto& t : tracks::OfficialTracks()) levels.push_back(t.level);
+    return StringArrayOf(levels);
+}
+std::string TracksGroup(const std::string& level) {
+    plugins::GameWork work;
+    for (const auto& t : tracks::OfficialTracks())
+        if (t.level == level) return t.group;
+    return "";
+}
+std::string TracksImage(const std::string& level) {
+    plugins::GameWork work;
+    return tracks::Image(level);
+}
+bool TracksOpen(const std::string& level) {
+    plugins::GameWork work;
+    return tracks::Open(level);
+}
+std::string TracksResultImage(int i) { return i < 0 ? "" : tracks::ResultImage(static_cast<size_t>(i)); }
+std::string TracksTitle(const std::string& level) {
+    plugins::GameWork work;
+    return tracks::Title(level);
+}
+void TracksSearch(const std::string& text) { tracks::Search(text); }
+std::string TracksSearchState() { return tracks::SearchState(); }
+int TracksResultCount() { return static_cast<int>(tracks::Results().size()); }
+int TracksTotal() { return tracks::Total(); }
+std::string TracksResultTitle(int i) {
+    const auto& r = tracks::Results();
+    return i >= 0 && static_cast<size_t>(i) < r.size() ? r[static_cast<size_t>(i)].title : "";
+}
+std::string TracksResultId(int i) {
+    const auto& r = tracks::Results();
+    return i >= 0 && static_cast<size_t>(i) < r.size() ? std::to_string(r[static_cast<size_t>(i)].id) : "";
+}
+bool TracksOpenWorkshop(const std::string& id) {
+    plugins::GameWork work;
+    return tracks::OpenWorkshop(std::strtoull(id.c_str(), nullptr, 10));
+}
+std::string TracksOpenState() { return tracks::OpenState(); }
+
+void RegisterGhosts() {
+    e->SetDefaultNamespace("Ghosts");
+    Global("bool Load(const string &in leaderboard = \"\", int count = 25)", asFUNCTION(GhostsLoad));
+    Global("string State()", asFUNCTION(GhostsState));
+    Global("string Leaderboard()", asFUNCTION(GhostsLeaderboard));
+    Global("int Entries()", asFUNCTION(GhostsEntries));
+    Global("int WithoutReplay()", asFUNCTION(GhostsWithoutReplay));
+    Global("int Count()", asFUNCTION(GhostsCount));
+    Global("string Name(int)", asFUNCTION(GhostName));
+    Global("int Rank(int)", asFUNCTION(GhostRank));
+    Global("double Time(int)", asFUNCTION(GhostTime));
+    Global("bool IsOwn(int)", asFUNCTION(GhostIsOwn));
+    Global("int SampleCount(int)", asFUNCTION(GhostSampleCount));
+    Global("bool Sample(int, int, double &out, double &out, double &out, double &out)", asFUNCTION(GhostSample));
+    Global("bool Position(int, double, double &out, double &out, double &out)", asFUNCTION(GhostPosition));
+    Global("array<double>@ Splits(int)", asFUNCTION(GhostSplits));
+    Global("array<int>@ CheckpointOrder(int)", asFUNCTION(GhostOrder));
+    Global("int CheckpointCount()", asFUNCTION(GhostsCheckpointCount));
+    Global("int PlayerBall(int)", asFUNCTION(GhostsPlayerBall));
+    Global("bool PlaceBall(int id, int ghost, double time)", asFUNCTION(GhostsPlaceBall));
+    Global("bool ShowBallName(int id, bool shown)", asFUNCTION(GhostsBallName));
+    Global("int CrowdCreate(double radius, const array<float>@ palette)", asFUNCTION(GhostsCrowdCreate));
+    Global("bool CrowdMembers(int id, const array<int>@ ghosts, const array<int>@ groups)", asFUNCTION(GhostsCrowdMembers));
+    Global("bool CrowdSkins(int id)", asFUNCTION(GhostsCrowdSkins));
+    Global("bool CrowdTrails(int id, double radius, float opacity, double chunkSeconds = 0)", asFUNCTION(GhostsCrowdTrails));
+    Global("bool CrowdTrailsUpTo(int id, double time)", asFUNCTION(GhostsCrowdTrailsUpTo));
+    Global("bool CrowdShowTrails(int id, bool shown)", asFUNCTION(GhostsCrowdShowTrails));
+    Global("bool CrowdTimes(int id, const array<double>@ offsets, const array<bool>@ shown)", asFUNCTION(GhostsCrowdTimes));
+    Global("bool CrowdPlace(int id, double time)", asFUNCTION(GhostsCrowdPlace));
+    Global("bool View(int, double, double &out, double &out, double &out, double &out, double &out, double &out)", asFUNCTION(GhostsView));
+    Global("bool Checkpoint(int, int &out, double &out, double &out, double &out)", asFUNCTION(GhostsCheckpoint));
+    e->SetDefaultNamespace("Tracks");
+    Global("array<string>@ Official()", asFUNCTION(TracksOfficial));
+    Global("string Title(const string &in)", asFUNCTION(TracksTitle));
+    Global("string Group(const string &in)", asFUNCTION(TracksGroup));
+    Global("string Image(const string &in)", asFUNCTION(TracksImage));
+    Global("bool Open(const string &in)", asFUNCTION(TracksOpen));
+    Global("void Search(const string &in)", asFUNCTION(TracksSearch));
+    Global("string SearchState()", asFUNCTION(TracksSearchState));
+    Global("int ResultCount()", asFUNCTION(TracksResultCount));
+    Global("int Total()", asFUNCTION(TracksTotal));
+    Global("string ResultTitle(int)", asFUNCTION(TracksResultTitle));
+    Global("string ResultId(int)", asFUNCTION(TracksResultId));
+    Global("string ResultImage(int)", asFUNCTION(TracksResultImage));
+    Global("bool OpenWorkshop(const string &in)", asFUNCTION(TracksOpenWorkshop));
+    Global("string OpenState()", asFUNCTION(TracksOpenState));
+    e->SetDefaultNamespace("Draw");
+    Global("int Tube(const array<double>@ path, double radius, float r, float g, float b, bool glow = false, float opacity = 1)", asFUNCTION(DrawTube));
+    Global("bool Glow(int id, float r, float g, float b, float brightness)", asFUNCTION(DrawGlow));
+    Global("bool Fade(int id, float opacity)", asFUNCTION(DrawFade));
+    Global("int Ball(double radius, float r, float g, float b, bool glow = false)", asFUNCTION(DrawBall));
+    Global("bool Move(int, double, double, double)", asFUNCTION(DrawMove));
+    Global("bool Show(int, bool)", asFUNCTION(DrawShow));
+    Global("void Remove(int)", asFUNCTION(DrawRemove));
+    Global("void Clear()", asFUNCTION(DrawClear));
+    e->SetDefaultNamespace("Camera");
+    Global("bool Project(double, double, double, float &out, float &out)", asFUNCTION(CameraProject));
+    Global("bool Take()", asFUNCTION(CameraTake));
+    Global("bool Set(double x, double y, double z, double pitch, double yaw, double fov = 90)", asFUNCTION(CameraSet));
+    Global("void Release()", asFUNCTION(CameraRelease));
+    Global("bool IsTaken()", asFUNCTION(CameraHas));
+}
+
 void RegisterReplay() {
     e->SetDefaultNamespace("Replay");
     Check(e->RegisterEnum("Camera"), "Replay::Camera");
@@ -889,6 +1198,7 @@ void Register(asIScriptEngine* engine) {
     RegisterCore();
     RegisterUi();
     RegisterInput();
+    RegisterGhosts();
     RegisterRace();
     RegisterHud();
     RegisterEditor();

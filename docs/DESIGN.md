@@ -107,7 +107,7 @@ Typed wrappers built only from measured classes and functions:
 
 ### 3.5 Script runtime
 - One AngelScript engine; one module per plugin. Plugins cannot see each other's globals.
-- Each plugin has its own contexts. A line callback enforces a time budget per call (default 50 ms). An overrun suspends and disables the plugin instead of freezing the game.
+- Each plugin has its own contexts. A line callback enforces a time budget per call (default 50 ms). An overrun cuts the call short; a plugin that overruns more than 3 times in a minute (or in Main) is disabled, instead of freezing the game.
 - Script exceptions disable the offending plugin and show in the mod manager. They never reach the game.
 - Exports: a plugin publishes `shared` interfaces and functions (listed in info.toml). Dependents import them with full type checking.
 - Reload: runs `OnDisabled` and `OnDestroyed`, releases the plugin's world objects and UI, discards the module, recompiles. State can be handed over through storage.

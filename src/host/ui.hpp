@@ -59,7 +59,7 @@ void HideOwner(int owner);              // a stopped plugin: its windows and pan
 // A window's main area holds one or more views (groups of rows); one view is shown at a time. A plugin can clear a
 // view and fill it again (a list that changes). Cleared widgets are retired, not freed: the plugin may still hold
 // handles to them, and those stay valid but show nothing.
-enum class Kind { Text, Button, IconButton, Slider, Dropdown, Space, TextArea, TextInput, Image, CheckBox };
+enum class Kind { Text, Button, IconButton, Slider, Dropdown, Space, TextArea, TextInput, Image, CheckBox, Rect };
 
 // Where a window lives: its own layer on screen, or docked as a section of the track editor's details panel
 // (shown only while pieces are selected, since the panel's section list is).
@@ -72,6 +72,12 @@ struct Widget {
     Kind kind = Kind::Text;
     int row = 0;
     bool inSidebar = false;
+    // Placed at x, y (from the window's top left, inside its padding) on a layer over the rows, rather than in a
+    // row: rectangles (Kind::Rect, w x h) and texts added with AddTextAt. Moved and resized in place, not rebuilt.
+    bool placed = false;
+    float px = 0, py = 0, pw = 0, ph = 0;
+    bool placeDirty = false;
+    eng::Weak placedSlot;
     bool retired = false;               // cleared from its view
     bool visible = true;                // hidden widgets take no space
     std::string text;                   // text, button label, icon name ("play" / "pause"), text input hint, or image file
@@ -116,6 +122,7 @@ struct Window {
     float pivotX = 0.5f, pivotY = 1.0f;         // point of the window placed there (0..1)
     float offsetX = 0, offsetY = -40;           // pixels from the anchor
     Color background{0, 0, 0, 0.65f};
+    float cornerRadius = 0;                     // rounded corners (widget units), 0 square
     bool blocksClicks = false;                  // clicks on the window never reach what is underneath it
     int zOrder = 100;                           // windows with a higher z-order are drawn in front
     Dock dock = Dock::Screen;
@@ -174,7 +181,11 @@ void SetMovable(Window* w, bool movable, const std::string& pluginId);
 void ResetPositions(const std::string& pluginId);   // movable windows of a plugin back where the plugin put them
 bool HasMovable(const std::string& pluginId);
 Widget* AddWidget(Window* w, Kind kind, const std::string& text, float sizeOrWidth);
+// A rectangle or a text at x, y on the window's placed layer (see Widget::placed).
+Widget* AddPlaced(Window* w, Kind kind, const std::string& text, float size, float x, float y, float width, float height);
+void Place(Widget* item, float x, float y, float width, float height);
 void AddOption(Widget* dropdown, const std::string& option);
+void ClearOptions(Widget* dropdown);
 bool Typing();                          // a text input has keyboard focus: keys belong to it, not to plugins
 
 // Plugin windows on screen, as elements of the HUD a layout can move ("Window/<plugin id>/<n>", n counting that
@@ -199,6 +210,7 @@ void RemoveOwner(int owner);
 void HideOwner(int owner);
 bool SimulateClick(const std::string& label);
 std::string Status();
+double Height();                        // the footer bar's height on screen (UI units), 0 when there is none
 }  // namespace footer
 
 namespace windows {

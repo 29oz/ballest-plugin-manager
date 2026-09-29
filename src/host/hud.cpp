@@ -1,11 +1,14 @@
 #include "hud.hpp"
 
 #include <algorithm>
+#include <optional>
+#include <set>
 #include <cctype>
 #include <cmath>
 #include <cstring>
 #include <map>
 
+#include "cosmetics.hpp"
 #include "engine.hpp"
 #include "game.hpp"
 #include "log.hpp"
@@ -305,6 +308,8 @@ void Restore(Obj widget) {
 
 }  // namespace
 
+void HideGameFrame();
+
 void Frame() {
     if (gGeneration != game::Generation()) {        // a new map: everything found is gone with the old one
         gGeneration = game::Generation();
@@ -314,6 +319,7 @@ void Frame() {
         gRaceUi = {};
         gNextDiscover = 0;
     }
+    HideGameFrame();
     const double now = game::Seconds();
     if (race::OnTrack() && (now >= gNextDiscover || (!eng::Get(gRaceUi) && RaceUi()))) {
         gNextDiscover = now + 1;
@@ -423,6 +429,156 @@ void ResetPartColor(const std::string& key, const std::string& part) {
         gTints.erase(it);
         return;
     }
+}
+
+namespace {
+std::set<int> gHiders;
+// The game's race UI is hidden part by part, all but the footer (the plugin manager's footer lives in it, reported
+// missing when the whole UI was hidden): every widget beside the footer's line of parents is hidden, and each one's
+// own visibility kept to give back.
+struct HiddenPart {
+    eng::Weak widget;
+    uint8_t visibility = 0;
+};
+std::vector<HiddenPart> gHiddenParts;
+eng::Weak gHiddenIn;                    // the race UI they are in
+double gNextHide = 0;
+constexpr uint8_t kHidden = 2;          // ESlateVisibility::Hidden
+
+void RestoreGame() {
+    for (const auto& part : gHiddenParts)
+        if (Obj widget = eng::Get(part.widget)) w::SetVisibility(widget, part.visibility);
+    gHiddenParts.clear();
+    gHiddenIn = {};
+}
+
+void HidePart(Obj widget) {
+    for (const auto& part : gHiddenParts)
+        if (eng::Get(part.widget) == widget) {
+            w::SetVisibility(widget, kHidden);          // the game may have shown it again
+            return;
+        }
+    gHiddenParts.push_back({eng::MakeWeak(widget), eng::Call(widget, "GetVisibility").ReturnAs<uint8_t>(0)});
+    w::SetVisibility(widget, kHidden);
+}
+
+// Every panel from the footer up to the race UI's root, the footer first. A user widget's root has no parent: the
+// line goes on from the user widget holding that tree.
+std::vector<Obj> FooterLine(Obj raceUi) {
+    std::vector<Obj> line;
+    Obj footer = w::FindFirst(raceUi, eng::FindClass("WBP_Footer_C"));
+    for (Obj x = footer; x && x != raceUi && line.size() < 64;) {
+        line.push_back(x);
+        Obj parent = eng::Call(x, "GetParent").ReturnObj();
+        if (!parent) {
+            Obj tree = eng::OuterOf(x);
+            parent = tree ? eng::OuterOf(tree) : nullptr;       // the user widget whose tree this is
+        }
+        x = parent;
+    }
+    return line;
+}
+
+// The player's own ball, hidden for plugins that asked (Race::HideBall): its actor, the game's special skin actor and
+// the host's cosmetic models on it, each one's own hidden state kept to give back.
+std::set<int> gBallHiders;
+struct HiddenActor {
+    eng::Weak actor;
+    bool wasHidden = false;
+};
+std::vector<HiddenActor> gHiddenActors;
+double gNextBallHide = 0, gNextBallScan = 0;
+eng::Weak gBall;                        // the player's ball, once found
+
+void RestoreBall() {
+    for (const auto& h : gHiddenActors)
+        if (Obj a = eng::Get(h.actor)) eng::Call(a, "SetActorHiddenInGame", static_cast<uint8_t>(h.wasHidden));
+    gHiddenActors.clear();
+}
+
+void HideActor(Obj actor) {
+    for (const auto& h : gHiddenActors)
+        if (eng::Get(h.actor) == actor) {
+            eng::Call(actor, "SetActorHiddenInGame", uint8_t{1});     // shown again since (a cosmetic rebuilt, say)
+            return;
+        }
+    bool hidden = false;
+    eng::ReadBool(actor, "bHidden", &hidden);
+    gHiddenActors.push_back({eng::MakeWeak(actor), hidden});
+    hostlog::Info("hud: hid " + eng::ObjName(actor) + ", with the player's ball");
+    eng::Call(actor, "SetActorHiddenInGame", uint8_t{1});
+}
+
+void HideBallFrame() {
+    if (gBallHiders.empty()) return RestoreBall();
+    const double now = game::Seconds();
+    if (now < gNextBallHide) return;
+    gNextBallHide = now + 0.25;
+    // The player's ball is the map's BP_RollingBall_C, not the controller's pawn: that can be the fly-over camera
+    // (measured: BP_CameraFlyOver_C in the ghost viewer). Found by a scan of every object, so kept and looked for
+    // again only when it's gone, at most every 2 s.
+    Obj pawn = eng::Get(gBall);
+    if (!pawn && now >= gNextBallScan) {
+        gNextBallScan = now + 2;
+        if (Obj cls = eng::FindClass("BP_RollingBall_C"))
+            eng::ForEachObject([&](Obj o) {
+                if (eng::IsDefaultObject(o) || eng::ClassOf(o) != cls || !eng::IsLive(o)) return true;
+                pawn = o;
+                return false;
+            });
+        gBall = eng::MakeWeak(pawn);
+    }
+    if (!pawn) return;
+    // The ball, the game's actor for special skins (CustomSkinChild), and models the host built on it (cosmetics).
+    HideActor(pawn);
+    if (Obj skin = eng::ReadObj(pawn, "CustomSkinChild")) HideActor(skin);
+    for (Obj a : cosmetics::ModelActorsOn(pawn)) HideActor(a);
+}
+}  // namespace
+
+void HideBall(int owner, bool hidden) {
+    if (hidden) gBallHiders.insert(owner);
+    else gBallHiders.erase(owner);
+    if (gBallHiders.empty()) RestoreBall();
+    gNextBallHide = 0;
+}
+
+void HideGameFrame() {
+    HideBallFrame();
+    if (gHiders.empty()) return RestoreGame();
+    const double now = game::Seconds();
+    Obj raceUi = RaceUi();
+    if (eng::Get(gHiddenIn) != raceUi) {                // another map, another UI
+        gHiddenParts.clear();
+        gHiddenIn = eng::MakeWeak(raceUi);
+    }
+    if (!raceUi || now < gNextHide) return;
+    gNextHide = now + 0.25;
+    const std::vector<Obj> line = FooterLine(raceUi);
+    Obj root = RootOf(raceUi);
+    if (line.empty()) {                                 // no footer: all of it
+        if (root) HidePart(root);
+        return;
+    }
+    for (size_t k = 1; k < line.size(); ++k) {
+        Obj panel = line[k];
+        const int32_t n = eng::Call(panel, "GetChildrenCount").ReturnAs<int32_t>(0);
+        for (int32_t i = 0; i < n; ++i) {
+            Obj child = eng::Call(panel, "GetChildAt", i).ReturnObj();
+            if (child && child != line[k - 1]) HidePart(child);
+        }
+    }
+}
+
+void HideGame(int owner, bool hidden) {
+    if (hidden) gHiders.insert(owner);
+    else gHiders.erase(owner);
+    if (gHiders.empty()) RestoreGame();
+}
+
+void RemoveOwner(int owner) {
+    HideGame(owner, false);
+    HideBall(owner, false);
 }
 
 }  // namespace hud

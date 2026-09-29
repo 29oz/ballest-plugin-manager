@@ -1,5 +1,8 @@
 #include "game.hpp"
 
+#include <cstring>
+#include <vector>
+
 #include <windows.h>
 
 #include <set>
@@ -135,6 +138,40 @@ bool MousePosition(double* x, double* y) {
     *x = mouse.x;
     *y = mouse.y;
     return true;
+}
+
+bool ScreenSize(double* width, double* height) {
+    Obj controller = PlayerController();
+    if (!controller) return false;
+    struct Vec2d {
+        double x, y;
+    };
+    Obj layout = eng::FindCdo("WidgetLayoutLibrary");
+    const Vec2d size = eng::Call(layout, "GetViewportSize", controller).ReturnAs<Vec2d>(Vec2d{0, 0});
+    const float scale = eng::Call(layout, "GetViewportScale", controller).ReturnAs<float>(0.0f);
+    if (size.x <= 0 || size.y <= 0 || scale <= 0) return false;
+    *width = size.x / scale;
+    *height = size.y / scale;
+    return true;
+}
+
+double MouseWheel() {
+    Obj controller = PlayerController();
+    Obj fn = controller ? eng::FindFunction(eng::ClassOf(controller), "GetInputAnalogKeyState") : nullptr;
+    if (!fn) return 0;
+    // FKey: its KeyName (an FName) first, the rest (the key's details, looked up by name) left empty.
+    const std::wstring key = L"MouseWheelAxis";
+    const eng::Params name = eng::Call(eng::FindCdo("KismetStringLibrary"), "Conv_StringToName",
+                                       eng::FString{key.c_str(), static_cast<int32_t>(key.size() + 1), static_cast<int32_t>(key.size() + 1)});
+    const uint8_t* fname = name.Return();
+    eng::Params p(fn);
+    const int32_t size = p.SizeOf("Key");
+    if (!fname || size < 8) return 0;
+    std::vector<uint8_t> bytes(static_cast<size_t>(size), 0);
+    std::memcpy(bytes.data(), fname, 8);
+    p.Set("Key", bytes.data(), bytes.size());
+    if (!eng::Invoke(controller, p)) return 0;
+    return p.ReturnAs<float>(0.0f);
 }
 
 }  // namespace game

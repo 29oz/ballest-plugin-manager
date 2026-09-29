@@ -1,0 +1,266 @@
+#include "steam.hpp"
+
+#include <windows.h>
+
+#include <algorithm>
+#include <cstring>
+
+#include "log.hpp"
+
+namespace steam {
+namespace {
+
+using Call = uint64_t;                  // SteamAPICall_t
+constexpr Call kInvalidCall = 0;
+constexpr int kResultOk = 1;            // EResult k_EResultOK
+
+// Callback ids (k_iCallback) and sizes of the results polled for.
+constexpr int kLeaderboardFindResult = 1104, kLeaderboardFindResultSize = 16;
+constexpr int kLeaderboardScoresDownloaded = 1105, kLeaderboardScoresDownloadedSize = 24;
+constexpr int kDownloadUGCResult = 1317, kDownloadUGCResultSize = 296;
+constexpr int kUGCQueryCompleted = 3401, kUGCQueryCompletedSize = 280;
+// SteamUGCDetails_t: m_nPublishedFileId at 0, m_rgchTitle[129] at 24, m_ulSteamIDOwner at 8160, m_hFile at 9216,
+// m_hPreviewFile at 9224 (after m_rgchTags[1025] from 8187, aligned to 8); the whole struct is a little under 10 KB,
+// so it is read into a larger buffer.
+constexpr size_t kDetailsTitle = 24, kDetailsTitleSize = 129, kDetailsOwner = 8160, kDetailsPreview = 9224, kDetailsBuffer = 16384;
+constexpr int kLeaderboardRequestGlobal = 0, kLeaderboardRequestAroundUser = 1;   // ELeaderboardDataRequest
+constexpr int kUGCQueryRankedByTextSearch = 11, kUGCMatchingItems = 0;           // EUGCQuery, EUGCMatchingUGCType
+constexpr int kUGCReadUntilFinished = 0;                                         // EUGCReadAction
+
+struct Api {
+    void* stats = nullptr;
+    void* storage = nullptr;
+    void* ugc = nullptr;
+    void* utils = nullptr;
+    Call (*findLeaderboard)(void*, const char*) = nullptr;
+    Call (*downloadEntries)(void*, uint64_t, int, int, int) = nullptr;
+    bool (*downloadedEntry)(void*, uint64_t, int, void*, int32_t*, int) = nullptr;
+    Call (*ugcDownload)(void*, uint64_t, uint32_t) = nullptr;
+    int32_t (*ugcRead)(void*, uint64_t, void*, int32_t, uint32_t, int) = nullptr;
+    bool (*callCompleted)(void*, Call, bool*) = nullptr;
+    bool (*callResult)(void*, Call, void*, int, int, bool*) = nullptr;
+    uint32_t (*appId)(void*) = nullptr;
+    uint64_t (*createQuery)(void*, int, int, uint32_t, uint32_t, uint32_t) = nullptr;
+    bool (*setSearchText)(void*, uint64_t, const char*) = nullptr;
+    Call (*sendQuery)(void*, uint64_t) = nullptr;
+    bool (*queryResult)(void*, uint64_t, uint32_t, void*) = nullptr;
+    bool (*releaseQuery)(void*, uint64_t) = nullptr;
+    uint32_t (*itemState)(void*, uint64_t) = nullptr;
+    int (*entryCount)(void*, uint64_t) = nullptr;
+    bool (*itemInstallInfo)(void*, uint64_t, uint64_t*, char*, uint32_t, uint32_t*) = nullptr;
+    bool (*downloadItem)(void*, uint64_t, bool) = nullptr;
+    bool ok = false;
+};
+
+Api& TheApi() {
+    static Api api;
+    static bool tried = false;
+    if (tried) return api;
+    tried = true;
+    HMODULE dll = GetModuleHandleW(L"steam_api64.dll");
+    if (!dll) {
+        hostlog::Warn("steam: the game's steam_api64.dll is not loaded");
+        return api;
+    }
+    auto get = [&](const char* name) {
+        FARPROC p = GetProcAddress(dll, name);
+        if (!p) hostlog::Warn(std::string("steam: missing ") + name);
+        return reinterpret_cast<void*>(p);
+    };
+    auto open = [&](const char* name) {
+        auto accessor = reinterpret_cast<void* (*)()>(get(name));
+        return accessor ? accessor() : nullptr;
+    };
+    api.stats = open("SteamAPI_SteamUserStats_v013");
+    api.storage = open("SteamAPI_SteamRemoteStorage_v016");
+    api.ugc = open("SteamAPI_SteamUGC_v021");
+    api.utils = open("SteamAPI_SteamUtils_v010");
+    api.findLeaderboard = reinterpret_cast<decltype(api.findLeaderboard)>(get("SteamAPI_ISteamUserStats_FindLeaderboard"));
+    api.downloadEntries = reinterpret_cast<decltype(api.downloadEntries)>(get("SteamAPI_ISteamUserStats_DownloadLeaderboardEntries"));
+    api.downloadedEntry = reinterpret_cast<decltype(api.downloadedEntry)>(get("SteamAPI_ISteamUserStats_GetDownloadedLeaderboardEntry"));
+    api.ugcDownload = reinterpret_cast<decltype(api.ugcDownload)>(get("SteamAPI_ISteamRemoteStorage_UGCDownload"));
+    api.ugcRead = reinterpret_cast<decltype(api.ugcRead)>(get("SteamAPI_ISteamRemoteStorage_UGCRead"));
+    api.callCompleted = reinterpret_cast<decltype(api.callCompleted)>(get("SteamAPI_ISteamUtils_IsAPICallCompleted"));
+    api.callResult = reinterpret_cast<decltype(api.callResult)>(get("SteamAPI_ISteamUtils_GetAPICallResult"));
+    api.appId = reinterpret_cast<decltype(api.appId)>(get("SteamAPI_ISteamUtils_GetAppID"));
+    api.createQuery = reinterpret_cast<decltype(api.createQuery)>(get("SteamAPI_ISteamUGC_CreateQueryAllUGCRequestPage"));
+    api.setSearchText = reinterpret_cast<decltype(api.setSearchText)>(get("SteamAPI_ISteamUGC_SetSearchText"));
+    api.sendQuery = reinterpret_cast<decltype(api.sendQuery)>(get("SteamAPI_ISteamUGC_SendQueryUGCRequest"));
+    api.queryResult = reinterpret_cast<decltype(api.queryResult)>(get("SteamAPI_ISteamUGC_GetQueryUGCResult"));
+    api.releaseQuery = reinterpret_cast<decltype(api.releaseQuery)>(get("SteamAPI_ISteamUGC_ReleaseQueryUGCRequest"));
+    api.itemState = reinterpret_cast<decltype(api.itemState)>(get("SteamAPI_ISteamUGC_GetItemState"));
+    api.entryCount = reinterpret_cast<decltype(api.entryCount)>(get("SteamAPI_ISteamUserStats_GetLeaderboardEntryCount"));
+    api.itemInstallInfo = reinterpret_cast<decltype(api.itemInstallInfo)>(get("SteamAPI_ISteamUGC_GetItemInstallInfo"));
+    api.downloadItem = reinterpret_cast<decltype(api.downloadItem)>(get("SteamAPI_ISteamUGC_DownloadItem"));
+    api.ok = api.stats && api.storage && api.ugc && api.utils && api.findLeaderboard && api.downloadEntries && api.downloadedEntry &&
+             api.ugcDownload && api.ugcRead && api.callCompleted && api.callResult && api.appId && api.createQuery && api.setSearchText &&
+             api.sendQuery && api.queryResult && api.releaseQuery && api.itemState && api.itemInstallInfo && api.downloadItem &&
+             api.entryCount;
+    hostlog::Info(api.ok ? "steam: ready" : "steam: not everything needed is there; leaderboard ghosts are off");
+    return api;
+}
+
+// A request under way: polled until Steam has its result, which is then handed to `done` (failed: no result).
+struct Request {
+    Call call = kInvalidCall;
+    int callback = 0, size = 0;
+    std::function<void(const uint8_t* result, bool failed)> done;
+};
+std::vector<Request> gRequests;
+
+void Start(Call call, int callback, int size, std::function<void(const uint8_t*, bool)> done) {
+    if (call == kInvalidCall) return done(nullptr, true);
+    gRequests.push_back({call, callback, size, std::move(done)});
+}
+
+template <class T>
+T At(const uint8_t* p, size_t offset) {
+    T v;
+    std::memcpy(&v, p + offset, sizeof v);
+    return v;
+}
+
+void ReadEntries(uint64_t entries, int count, std::function<void(bool, std::vector<Entry>)>& done) {
+    Api& api = TheApi();
+    std::vector<Entry> list;
+    for (int i = 0; i < count; ++i) {
+        uint8_t raw[32] = {};           // LeaderboardEntry_t: steamID 0, rank 8, score 12, details 16, UGC handle 24
+        if (!api.downloadedEntry(api.stats, entries, i, raw, nullptr, 0)) continue;
+        const uint64_t file = At<uint64_t>(raw, 24);
+        list.push_back({At<uint64_t>(raw, 0), At<int32_t>(raw, 8), At<int32_t>(raw, 12), file == ~0ull ? 0 : file});
+    }
+    done(true, std::move(list));
+}
+
+}  // namespace
+
+bool Available() { return TheApi().ok; }
+int Pending() { return static_cast<int>(gRequests.size()); }
+
+void Frame() {
+    if (gRequests.empty()) return;
+    Api& api = TheApi();
+    // A request's `done` may start more; they are polled from the next frame.
+    std::vector<Request> ready;
+    for (size_t i = 0; i < gRequests.size();) {
+        bool failed = false;
+        if (api.callCompleted(api.utils, gRequests[i].call, &failed)) {
+            ready.push_back(std::move(gRequests[i]));
+            gRequests.erase(gRequests.begin() + static_cast<std::ptrdiff_t>(i));
+        } else {
+            ++i;
+        }
+    }
+    for (auto& r : ready) {
+        std::vector<uint8_t> result(static_cast<size_t>(r.size));
+        bool failed = false;
+        const bool got = api.callResult(api.utils, r.call, result.data(), r.size, r.callback, &failed);
+        r.done(got && !failed ? result.data() : nullptr, !got || failed);
+    }
+}
+
+void FindLeaderboard(const std::string& name, std::function<void(uint64_t)> done) {
+    Api& api = TheApi();
+    if (!api.ok) return done(0);
+    Start(api.findLeaderboard(api.stats, name.c_str()), kLeaderboardFindResult, kLeaderboardFindResultSize,
+          [done](const uint8_t* r, bool failed) { done(!failed && r && At<uint8_t>(r, 8) ? At<uint64_t>(r, 0) : 0); });
+}
+
+void DownloadEntries(uint64_t leaderboard, int first, int last, std::function<void(bool, std::vector<Entry>)> done) {
+    Api& api = TheApi();
+    if (!api.ok || !leaderboard) return done(false, {});
+    Start(api.downloadEntries(api.stats, leaderboard, kLeaderboardRequestGlobal, first, last), kLeaderboardScoresDownloaded,
+          kLeaderboardScoresDownloadedSize, [done](const uint8_t* r, bool failed) mutable {
+              if (failed || !r) return done(false, {});
+              ReadEntries(At<uint64_t>(r, 8), At<int32_t>(r, 16), done);
+          });
+}
+
+void DownloadOwnEntry(uint64_t leaderboard, std::function<void(bool, std::vector<Entry>)> done) {
+    Api& api = TheApi();
+    if (!api.ok || !leaderboard) return done(false, {});
+    Start(api.downloadEntries(api.stats, leaderboard, kLeaderboardRequestAroundUser, 0, 0), kLeaderboardScoresDownloaded,
+          kLeaderboardScoresDownloadedSize, [done](const uint8_t* r, bool failed) mutable {
+              if (failed || !r) return done(false, {});
+              ReadEntries(At<uint64_t>(r, 8), At<int32_t>(r, 16), done);
+          });
+}
+
+void DownloadFile(uint64_t file, std::function<void(bool, std::string)> done) {
+    Api& api = TheApi();
+    if (!api.ok || !file) return done(false, "");
+    Start(api.ugcDownload(api.storage, file, 0), kDownloadUGCResult, kDownloadUGCResultSize, [done, file](const uint8_t* r, bool failed) {
+        // RemoteStorageDownloadUGCResult_t: m_eResult 0, m_hFile 8, m_nAppID 16, m_nSizeInBytes 20.
+        if (failed || !r || At<int32_t>(r, 0) != kResultOk) return done(false, "");
+        const int32_t size = At<int32_t>(r, 20);
+        if (size <= 0 || size > 64 * 1024 * 1024) return done(false, "");
+        Api& a = TheApi();
+        std::string bytes(static_cast<size_t>(size), '\0');
+        const int32_t read = a.ugcRead(a.storage, file, bytes.data(), size, 0, kUGCReadUntilFinished);
+        if (read <= 0) return done(false, "");
+        bytes.resize(static_cast<size_t>(read));
+        done(true, std::move(bytes));
+    });
+}
+
+void SearchWorkshop(const std::string& text, int page, std::function<void(bool, std::vector<Item>, int)> done) {
+    Api& api = TheApi();
+    if (!api.ok) return done(false, {}, 0);
+    const uint32_t app = api.appId(api.utils);
+    const uint64_t query = api.createQuery(api.ugc, kUGCQueryRankedByTextSearch, kUGCMatchingItems, app, app, static_cast<uint32_t>(page < 1 ? 1 : page));
+    if (!query || query == ~0ull) return done(false, {}, 0);
+    if (!text.empty()) api.setSearchText(api.ugc, query, text.c_str());
+    Start(api.sendQuery(api.ugc, query), kUGCQueryCompleted, kUGCQueryCompletedSize, [done, query](const uint8_t* r, bool failed) {
+        Api& a = TheApi();
+        std::vector<Item> items;
+        int total = 0;
+        // SteamUGCQueryCompleted_t: m_handle 0, m_eResult 8, m_unNumResultsReturned 12, m_unTotalMatchingResults 16.
+        const bool ok = !failed && r && At<int32_t>(r, 8) == kResultOk;
+        if (ok) {
+            const uint32_t count = At<uint32_t>(r, 12);
+            total = static_cast<int>(At<uint32_t>(r, 16));
+            std::vector<uint8_t> details(kDetailsBuffer);
+            for (uint32_t i = 0; i < count; ++i) {
+                std::fill(details.begin(), details.end(), uint8_t{0});
+                if (!a.queryResult(a.ugc, query, i, details.data())) continue;
+                Item item;
+                item.id = At<uint64_t>(details.data(), 0);
+                item.owner = At<uint64_t>(details.data(), kDetailsOwner);
+                item.preview = At<uint64_t>(details.data(), kDetailsPreview);
+                if (item.preview == ~0ull) item.preview = 0;
+                const char* title = reinterpret_cast<const char*>(details.data() + kDetailsTitle);
+                item.title.assign(title, strnlen(title, kDetailsTitleSize));
+                items.push_back(std::move(item));
+            }
+        }
+        a.releaseQuery(a.ugc, query);
+        done(ok, std::move(items), total);
+    });
+}
+
+uint32_t ItemState(uint64_t item) {
+    Api& api = TheApi();
+    return api.ok && item ? api.itemState(api.ugc, item) : 0;
+}
+
+std::string ItemFolder(uint64_t item) {
+    Api& api = TheApi();
+    if (!api.ok || !item) return "";
+    uint64_t size = 0;
+    uint32_t stamp = 0;
+    char folder[1024] = {};
+    if (!api.itemInstallInfo(api.ugc, item, &size, folder, sizeof folder, &stamp)) return "";
+    return folder;
+}
+
+bool DownloadItem(uint64_t item) {
+    Api& api = TheApi();
+    return api.ok && item && api.downloadItem(api.ugc, item, true);
+}
+
+int EntryCount(uint64_t leaderboard) {
+    Api& api = TheApi();
+    return api.ok && leaderboard ? api.entryCount(api.stats, leaderboard) : 0;
+}
+
+}  // namespace steam

@@ -7,6 +7,10 @@
 #include <cstring>
 #include <string>
 
+#include "draw.hpp"
+#include "ghosts.hpp"
+#include "steam.hpp"
+#include "tracks.hpp"
 #include "cosmetics.hpp"
 #include "editor.hpp"
 #include "engine.hpp"
@@ -95,6 +99,10 @@ void HostFrame(float dt) {
     game::Frame();
     editor::Frame();
     race::Frame();
+    steam::Frame();
+    ghosts::Frame();
+    draw::Frame();
+    tracks::Frame();
     hud::Frame();
     replay::Frame(dt);
     cosmetics::Frame();

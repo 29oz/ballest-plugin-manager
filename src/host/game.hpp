@@ -22,6 +22,12 @@ void RequestCursor(int owner, bool visible);
 bool CursorShown();                         // the mouse cursor is on screen (menus, pause, a plugin asked)
 // The mouse on the game's viewport, in widget units (those of window offsets), top left 0,0. False if it is off it.
 bool MousePosition(double* x, double* y);
+// How far the mouse wheel turned this frame, as the player controller sees the
+// MouseWheelAxis key (GetInputAnalogKeyState).
+double MouseWheel();
+// The game's screen in widget units (those of window offsets and MousePosition): the viewport's size in pixels
+// (WidgetLayoutLibrary.GetViewportSize) over its DPI scale (GetViewportScale).
+bool ScreenSize(double* width, double* height);
 
 // The text input being typed in, or null. While there is one, input is UI-only with it focused: the game's
 // viewport ignores keys, so the player controller (whose "any key" event moves menu focus) and the pawn never

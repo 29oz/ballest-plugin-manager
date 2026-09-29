@@ -546,6 +546,20 @@ struct ModelOn {
 };
 std::vector<ModelOn> gModels;
 
+}  // namespace
+
+std::vector<Obj> ModelActorsOn(Obj ball) {
+    std::vector<Obj> out;
+    for (const auto& m : gModels) {
+        Obj component = eng::Get(m.component);
+        if (!component || eng::OuterOf(component) != ball) continue;
+        for (const auto& a : m.built.actors)
+            if (Obj actor = eng::Get(a)) out.push_back(actor);
+    }
+    return out;
+}
+
+namespace {
 void RemoveModel(Obj component) {
     for (size_t i = 0; i < gModels.size(); ++i)
         if (eng::Get(gModels[i].component) == component) {

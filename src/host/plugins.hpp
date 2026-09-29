@@ -1,5 +1,5 @@
 // Plugin runtime: discovers plugins/<id>/info.toml, compiles each plugin's AngelScript into its own module, and
-// calls its callbacks on the game thread with a time budget. A plugin that throws or overruns is stopped; the
+// calls its callbacks on the game thread with a time budget. A plugin that throws, or overruns often, is stopped; the
 // game and the other plugins carry on. Plugins can also be loaded and unloaded while the game runs (installs and
 // removals from the plugin browser). The script API itself is in api.cpp.
 #pragma once
@@ -8,7 +8,7 @@
 
 namespace plugins {
 
-constexpr const char* kHostVersion = "0.13.1";
+constexpr const char* kHostVersion = "0.14.0";
 
 void LoadAll(const std::wstring& pluginsDir);
 void Frame(float dt);

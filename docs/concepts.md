@@ -28,10 +28,13 @@ why the time budget below exists.
 ## The time budget
 
 Each callback has a time budget, 50 milliseconds unless `timeout` in `info.toml` says otherwise. If a callback is
-still running when it runs out, the host **stops the plugin** for the rest of the session:
+still running when it runs out, the host cuts it short there (the rest of that call doesn't run) and logs a warning.
+The plugin keeps running: a one-off hitch, such as the game loading something at the wrong moment, doesn't cost it
+the session. But a plugin that runs out of time a fourth time within a minute, or whose `Main` runs out, is
+**stopped** for the rest of the session:
 
-- its status becomes `stopped: exceeded its 50 ms budget` (shown on its card in the plugin manager's **installed** tab, and in
-  the log)
+- its status becomes `stopped: exceeded its 50 ms budget 4 times in a minute` (shown on its card in the plugin
+  manager's **installed** tab, and in the log)
 - its windows, panels and footer buttons are hidden, so nothing dead is left on screen
 - the game and the other plugins carry on
 

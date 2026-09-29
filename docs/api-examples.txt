@@ -63,6 +63,15 @@ older hosts then refuse to install or run the plugin.
 // Shown in an about panel
 aboutText.text = "running on plugin host " + Host::Version();
 
+== Host::MapNumber
+A number that goes up each time a map loads (the menu, a track, the editor). Compare two readings to tell that the
+map changed, even to another copy of the same track. Requires host 0.14.0.
+--
+int map = Host::MapNumber();
+// later
+if (Host::MapNumber() != map)
+    Log::Info("a new map is loaded");
+
 == Host::Time
 Seconds of real time since the plugin host started, which is when the game started. It keeps counting through
 pauses and loading screens. Use the difference between two readings to time things.
@@ -301,14 +310,15 @@ Whether the setting is at its default value (the value the variable starts with 
 resetButton.visible = !Settings::IsDefault(i);
 
 == Settings::Set
-**Plugin manager only.** Sets another plugin's setting from text. Numbers are clamped to `min`/`max`. Returns false
-if the text isn't a value of the setting's type. The owner's `OnSettingsChanged()` runs before its next `Update`.
+Sets a setting from text: the plugin manager any plugin's, a plugin its own (for a settings panel of its own).
+Numbers are clamped to `min`/`max`. Returns false if the text isn't a value of the setting's type. The owner's
+`OnSettingsChanged()` runs before its next `Update`.
 --
 if (input.Submitted() && !Settings::Set(i, input.text))
     Log::Warn("not a value for " + Settings::Name(i) + ": " + input.text);
 
 == Settings::Reset
-**Plugin manager only.** Puts a setting back to its default.
+Puts a setting back to its default: the plugin manager any plugin's, a plugin its own.
 --
 if (resetButton.Clicked())
     Settings::Reset(i);
@@ -431,6 +441,21 @@ plugin asks for it.
 // A window you can click while it's open
 window.visible = open;
 UI::SetCursorVisible(open);
+
+== UI::FooterHeight
+How tall the game's footer bar (the one plugin buttons sit in) is on screen, in the same units as `UI::ScreenSize`; 0
+when there is no footer. For keeping a window at the bottom of the screen clear of it.
+--
+float footerHeight = UI::FooterHeight();
+dock.SetRect(0, screenH - footerHeight - 200, screenW, 200);
+
+== UI::ScreenSize
+How big the game's screen is, in the units windows are placed in (`Window.SetRect`, `Input::MousePosition`). False
+before there is a screen. Requires host 0.14.0.
+--
+float w, h;
+if (UI::ScreenSize(w, h))
+    panel.SetRect(16, 16, 440, h - 120);    // down the left, stopping above a bar at the bottom
 
 == UI::CursorShown
 Whether the mouse cursor is on screen at all: because a plugin asked, or because the game shows it (pause menu,
@@ -564,6 +589,12 @@ Moves the window from its anchor, in pixels.
 window.SetAnchor(0, 0);
 window.SetOffset(40, 40);      // 40 pixels from the top left corner
 
+== UI::Window.SetCornerRadius
+Rounds the window's corners, `radius` in the units windows are placed in (`0`, the default, is square). Requires host
+0.14.0.
+--
+bar.SetCornerRadius(20);    // a pill
+
 == UI::Window.SetBackground
 The window's background colour, red, green, blue and opacity from 0 to 1. Opacity `0` removes the background.
 --
@@ -581,6 +612,23 @@ Adds a text. `size` is the font height in pixels (16 if left out).
 UI::Text@ timeText = window.AddText("0:00:00", 56);
 timeText.SetColor(0.24f, 1, 0.35f, 1);
 
+== UI::Window.AddTextAt
+Adds a text at `x, y` from the window's top left (inside its padding) instead of in a row, on a layer over the
+rows. Move it with `Text.SetPosition`; moving it doesn't rebuild the window, so it can follow something every frame.
+Requires host 0.14.0.
+--
+UI::Text@ label = window.AddTextAt("5s", 13, 200, 4);
+
+== UI::Window.AddRect
+Adds a filled rectangle at `x, y`, `width` by `height`, on the same layer as `AddTextAt`: for bars, markers and
+lines. Its colour, position and size change in place (`Rect.SetColor`, `Rect.SetRect`), without rebuilding the
+window. Requires host 0.14.0.
+--
+UI::Rect@ playhead = window.AddRect(400, 0, 2, 300);
+playhead.SetColor(1, 1, 1, 1);
+// every frame:
+playhead.SetRect(400 + time * pixelsPerSecond, 0, 2, 300);
+
 == UI::Window.AddButton
 Adds a button with a text label.
 --
@@ -594,7 +642,7 @@ UI::Button@ playButton = window.AddIconButton("pause");
 // later: playButton.icon = paused ? "play" : "pause";
 
 == UI::Window.AddSlider
-Adds a slider `width` pixels wide. Its value runs from 0 to 1.
+Adds a slider `width` pixels wide (`0`: the rest of the row, host 0.14.0). Its value runs from 0 to 1.
 --
 UI::Slider@ slider = window.AddSlider(600);
 
@@ -784,6 +832,21 @@ The text shown.
 --
 timeText.text = FormatTime(seconds);
 
+== UI::Text.SetPosition
+Moves a text added with `AddTextAt`, in place. Requires host 0.14.0.
+--
+label.SetPosition(x, 4);
+
+== UI::Rect.SetRect
+Moves and resizes a rectangle, in place. Requires host 0.14.0.
+--
+progress.SetRect(left, top, width * fraction, 12);
+
+== UI::Rect.SetColor
+The rectangle's colour: red, green, blue and opacity, 0 to 1. Requires host 0.14.0.
+--
+bar.SetColor(0.3f, 0.3f, 0.35f, 1);
+
 == UI::Text.SetColor
 The text's colour, red, green, blue and opacity from 0 to 1.
 --
@@ -878,6 +941,14 @@ Adds a choice at the end of the list.
 array<string> speeds = {".5x", "1x", "2x"};
 for (uint i = 0; i < speeds.length(); i++)
     speedBox.AddOption(speeds[i]);
+
+== UI::Dropdown.ClearOptions
+Removes every option, so the list can be filled again (nothing is selected until `selected` is set). Requires host
+0.14.0.
+--
+routeList.ClearOptions();
+for (uint r = 0; r < routes.length(); r++)
+    routeList.AddOption(routes[r]);
 
 == UI::Dropdown.selected
 The index of the chosen option. Setting it doesn't count as a change (`Changed()` stays false). An index outside the
@@ -993,8 +1064,9 @@ zBox.SetColor(0.0251f, 0.207f, 0.85f, 1);
 The keyboard, mouse and controller, read only while the game window has focus. While the player is typing in a
 plugin's text box, every key reads as up except `Input::Escape`, so Escape can still close a menu (for the game's own
 text boxes, check `Editor::Typing()`). Keys are `Input::Key` values: named keys such as `Input::F5`, `Input::PageUp`,
-`Input::Backspace`, `Input::MouseBack`, `Input::A` to `Input::Z`, `Input::N0` to `Input::N9` for the number row,
-`Input::Numpad0` to `Input::Numpad9`, and controller buttons: `Input::PadA`, `PadB`, `PadX`, `PadY`, `PadLB`, `PadRB`,
+`Input::Backspace`, `Input::MouseBack`, `Input::Win` and `Input::RightWin` (the Windows keys), `Input::A` to
+`Input::Z`, `Input::N0` to `Input::N9` for the number row, `Input::Numpad0` to `Input::Numpad9`, and controller
+buttons: `Input::PadA`, `PadB`, `PadX`, `PadY`, `PadLB`, `PadRB`,
 `PadLT`, `PadRT`, `PadL3`, `PadR3`, `PadView`, `PadMenu`, the D-pad (`PadUp`, `PadDown`, `PadLeft`, `PadRight`) and
 the left stick pushed a direction (`PadStickUp`, ...). Controllers are read with XInput (Xbox pads, and most others
 through Steam Input). The Down arrow is `Input::Key::Down`, since `Input::Down` is also the function below.
@@ -1032,6 +1104,12 @@ Where the mouse is on the game's screen, from the top left, in the units windows
 float x, y;
 if (Input::MousePosition(x, y))
     Log::Info("mouse at " + x + ", " + y);
+
+== Input::Wheel
+How far the mouse wheel turned this frame (0 when it didn't turn), as the game's own controls read it. Requires
+host 0.14.0.
+--
+speed *= Math::pow(1.2, Input::Wheel());
 
 @@ Race
 The race the player is in.
@@ -1146,6 +1224,12 @@ restarts, gets a new ball or leaves the map.
 --
 Race::StartPractice();
 
+== Race::HideBall
+Hides the player's own ball while `true` (with the game's special skin actor and the host's cosmetic models on it), and
+gives it back with `false` or when the plugin stops. For a view of the track without it, such as a ghost viewer.
+--
+Race::HideBall(true);
+
 == Race::IsPractice
 Whether this run is a practice run.
 --
@@ -1221,6 +1305,14 @@ Hud::SetPartColor("PlayerUI/WBP_InputVisualizer", "Key_Jump", 1.0f, 0.1f, 0.1f, 
 Gives the part back its own colour.
 --
 Hud::ResetPartColor("PlayerUI/WBP_InputVisualizer", "Key_Jump");
+
+== Hud::HideGame
+Hides the game's race UI (the HUD, the header, the leaderboard and the race's menus) while `true`, and puts it back
+with `false` or when the plugin stops. The footer bar stays, with the plugin buttons in it (`UI::FooterHeight` says how
+tall it is). What's hidden can't be clicked, so its buttons can't be pressed unseen.
+For a clear view of the track, such as a replay or ghost viewer. Requires host 0.14.0.
+--
+Hud::HideGame(true);     // nothing of the game's over the track
 
 @@ Editor
 The track editor. Pieces are identified by `int` ids. An id stops working once its piece is deleted: the functions
@@ -1622,3 +1714,432 @@ Shows a short note after the leaderboard's title, kept there when the game rebui
 goes when the plugin stops. If two plugins set one, the last one shows.
 --
 Leaderboard::SetTitleNote("· 12,345 players");
+
+@@ Ghosts
+The leaderboard ghosts of the track on screen: the top entries of its Steam leaderboard and your own, each with the
+path its ball took. Everything here needs host 0.14.0. Loading takes a few seconds (every replay is a download); read
+`State` to follow it. Nothing here races: loading ghosts never touches your own run.
+
+== Ghosts::Load
+Starts loading the top `count` entries of a leaderboard (`0` for every entry: each replay is about 80 KB, so a
+popular track's whole leaderboard is a long download), plus your own entry. `leaderboard` `""` is the leaderboard of
+the track on screen (the game's own tracks and workshop tracks alike); a name loads that leaderboard instead (the
+game's tracks use their level name, `"Map_LethTrial_01"`). Loading the same leaderboard again keeps the replays
+already loaded that are still wanted and downloads only the rest; another leaderboard replaces them. False if it
+can't start.
+--
+Ghosts::Load("", 25);    // the top 25 of the track on screen
+Ghosts::Load("", 100);   // then 75 more
+Ghosts::Load("", 0);     // then everyone
+
+== Ghosts::State
+How the load is going: `"idle"`, `"loading ..."` (with what it's doing), `"ready"`, or `"error: ..."`.
+--
+if (Ghosts::State() == "ready")
+    Log::Info(Ghosts::Count() + " ghosts loaded");
+
+== Ghosts::Leaderboard
+The Steam leaderboard's name, once it's known.
+--
+titleText.text = Ghosts::Leaderboard();
+
+== Ghosts::Entries
+How many entries the leaderboard has in all, once the top entries have arrived (0 until then).
+--
+statusText.text = Ghosts::Count() + " of " + Ghosts::Entries();
+
+== Ghosts::WithoutReplay
+How many of the entries asked for have no replay file on Steam, so there is nothing to load for them: why loading the
+top 1000 can give 994 runs.
+--
+string missing = Ghosts::WithoutReplay() > 0 ? Ghosts::WithoutReplay() + " have no replay" : "";
+
+== Ghosts::Count
+How many ghosts have arrived, in rank order. The list grows while replays download.
+--
+for (int i = 0; i < Ghosts::Count(); i++)
+    Log::Info(Ghosts::Rank(i) + ". " + Ghosts::Name(i));
+
+== Ghosts::Name
+The player's name, as saved with their replay.
+--
+Log::Info(Ghosts::Name(0) + " holds the record");
+
+== Ghosts::Rank
+The entry's global rank on the leaderboard (1 is the record).
+--
+int rank = Ghosts::Rank(i);
+
+== Ghosts::Time
+The run's time in seconds.
+--
+timeText.text = formatFloat(Ghosts::Time(i), "", 0, 3);
+
+== Ghosts::IsOwn
+Whether the entry is yours.
+--
+if (Ghosts::IsOwn(i))
+    nameText.text += " (you)";
+
+== Ghosts::SampleCount
+How many samples the replay has: the ball's position about ten times a second.
+--
+int samples = Ghosts::SampleCount(i);
+
+== Ghosts::Sample
+One sample of a replay: its time from the start and where the ball was. False if there's no such sample.
+--
+// the whole path, for Draw::Tube
+array<double> path;
+double t, x, y, z;
+for (int j = 0; j < Ghosts::SampleCount(i); j++)
+    if (Ghosts::Sample(i, j, t, x, y, z))
+    {
+        path.insertLast(x);
+        path.insertLast(y);
+        path.insertLast(z);
+    }
+
+== Ghosts::Position
+Where the ball was at a time from the start of the run, between samples along a straight line (before the start or
+after the end: the first or last sample).
+--
+double x, y, z;
+if (Ghosts::Position(i, playTime, x, y, z))
+    Draw::Move(ball, x, y, z);
+
+== Ghosts::Splits
+The times the run took its checkpoints, in the order it took them.
+--
+array<double>@ splits = Ghosts::Splits(i);
+
+== Ghosts::CheckpointOrder
+The numbers of the checkpoints the run took, in order: for each split, the checkpoint nearest to where the ball was
+then. Two runs with the same order took the same route. 0 for a split no checkpoint matched.
+--
+array<int>@ order = Ghosts::CheckpointOrder(i);
+string route = "";
+for (uint k = 0; k < order.length(); k++)
+    route += (k == 0 ? "" : ",") + order[k];
+
+== Ghosts::CheckpointCount
+How many checkpoints the track on screen has (the finish is one of them).
+--
+Log::Info(Ghosts::CheckpointCount() + " checkpoints");
+
+== Ghosts::View
+Where a ghost's player was looking at time `t`: their camera as the game would have placed it (the ball's camera,
+turned the way they turned it), for watching the run as they saw it. Gives the camera's position, pitch, yaw and
+field of view, ready for `Camera::Set`. The game's camera also pulls in when it would go through the track; this
+doesn't. False if the replay didn't record where they looked.
+--
+double x, y, z, pitch, yaw, fov;
+if (Ghosts::View(0, time, x, y, z, pitch, yaw, fov))
+    Camera::Set(x, y, z, pitch, yaw, fov);
+
+== Ghosts::PlayerBall
+The player's own ball for a ghost, as the game shows other players' balls: their skin (or special ball), their
+accessory, see-through like the game's ghosts, with their name over it. Returns a `Draw` id (show, hide and remove
+it like a shape), or 0 if it couldn't be made. Move it with `PlaceBall`.
+--
+int ball = Ghosts::PlayerBall(0);
+
+== Ghosts::PlaceBall
+Puts a ball from `PlayerBall` where that ghost was at `time`, turning the way their ball turned.
+--
+Ghosts::PlaceBall(ball, 0, time);
+
+== Ghosts::ShowBallName
+Shows or hides the name over a ball from `PlayerBall`.
+--
+Ghosts::ShowBallName(ball, false);
+
+== Ghosts::CrowdCreate
+A crowd: many ghosts' balls drawn at once, for thousands of them, where a ball each would be too many objects. The
+balls are glowing spheres of `radius`, in colour groups (`palette`: red, green, blue for each group). Returns a
+`Draw` id (remove it like a shape), or 0.
+--
+array<float> palette = {1, 0.2f, 0.2f,  0.2f, 0.6f, 1};    // two groups: red, blue
+int crowd = Ghosts::CrowdCreate(25, palette);
+
+== Ghosts::CrowdMembers
+Which ghosts are in the crowd, and each one's colour group (by place in the palette).
+--
+array<int> who = {30, 31, 32}, groups = {0, 1, 0};
+Ghosts::CrowdMembers(crowd, who, groups);
+
+== Ghosts::CrowdSkins
+Puts the crowd's members in their players' own skins: a ball the game's size, one instanced mesh per skin. They
+don't roll. A member whose skin doesn't load keeps its colour. Call it after `CrowdMembers`.
+--
+Ghosts::CrowdSkins(crowd);
+
+== Ghosts::CrowdTrails
+A see-through trail for each member shown (`CrowdTimes`), in its colour group's colour (radius in cm, opacity from 0
+to 1, as `Draw::Tube`'s). They are built a few each frame, top ranks first, so there's no hitch. Several trails share
+one mesh, so they can't be hidden one by one: call it again after `CrowdTimes` changes who's shown, and they're built
+again for those.
+--
+Ghosts::CrowdTrails(crowd, 4, 0.25f);
+
+== Ghosts::CrowdTrailsUpTo
+With the trails built in chunks (`CrowdTrails`' last argument, in seconds), shows only the chunks each run has
+finished by `time` on its own clock: the trails so far, for a trail that grows as the balls roll.
+--
+Ghosts::CrowdTrails(crowd, 4, 0.25f, 1.0);
+Ghosts::CrowdTrailsUpTo(crowd, playTime);       // every frame
+
+== Ghosts::CrowdShowTrails
+Shows or hides the crowd's trails; ones still being built follow.
+--
+Ghosts::CrowdShowTrails(crowd, false);
+
+== Ghosts::CrowdTimes
+Per ghost (indexed by ghost, for every ghost loaded): its time offset (added to the time `CrowdPlace` is given), and
+whether it's shown.
+--
+Ghosts::CrowdTimes(crowd, offsets, shown);
+
+== Ghosts::CrowdPlace
+Puts every ball of the crowd where its ghost is at `time` (plus its offset), in one go. Call it every frame.
+--
+Ghosts::CrowdPlace(crowd, time);
+
+== Ghosts::Checkpoint
+One of the track's checkpoints, by index (0 to CheckpointCount - 1, in order of their number): its number and where
+it is. Checkpoints a track doesn't number (the game's own tracks, such as Leth Trial, leave them all unnumbered) are
+numbered 1, 2, 3 ... here, so each still has a number of its own.
+--
+int number;
+double x, y, z;
+if (Ghosts::Checkpoint(0, number, x, y, z))
+    Log::Info("checkpoint " + number + " at " + x + ", " + y + ", " + z);
+
+@@ Tracks
+Opening tracks from a plugin: the game's own, in the circuit's order, and workshop tracks found by a search. They open
+the way the game opens them. Everything here needs host 0.14.0.
+
+== Tracks::Official
+The game's own tracks by level name, grouped as its playlists group them: each circuit season in order, then the
+collabs, then the trials (The Tower and The Tower CPs). Empty away from the main menu, where the game doesn't have
+them loaded.
+--
+array<string>@ levels = Tracks::Official();
+
+== Tracks::Group
+Which playlist one of the game's tracks is in: `"season 1"`, `"season 2"`, ..., `"collabs"` or `"trials"`.
+--
+string group = Tracks::Group(levels[0]);
+
+== Tracks::Image
+A game track's preview picture, as a game texture path that `Window.AddImage` takes, or `""` if it has none.
+--
+string image = Tracks::Image(levels[0]);
+if (image != "")
+    window.AddImage(image, 160, 90);
+
+== Tracks::Title
+A track's name as the game shows it, or `""` when it only has its level name.
+--
+string title = Tracks::Title(levels[0]);
+
+== Tracks::Open
+Opens one of the game's tracks by its level name, as the game's own play button does. False if it didn't start.
+--
+Tracks::Open(levels[0]);
+
+== Tracks::Search
+Searches the workshop for tracks by name. Results arrive a moment later: see `SearchState`.
+--
+Tracks::Search("chaos");
+
+== Tracks::SearchState
+`"idle"`, `"searching"`, `"done"` or `"error: ..."`.
+--
+if (Tracks::SearchState() == "done")
+    Log::Info(Tracks::ResultCount() + " tracks found");
+
+== Tracks::ResultCount
+How many results the last search returned (the first page).
+--
+int found = Tracks::ResultCount();
+
+== Tracks::Total
+How many workshop items matched the last search in all.
+--
+Log::Info(Tracks::ResultCount() + " of " + Tracks::Total());
+
+== Tracks::ResultTitle
+A search result's title.
+--
+button.label = Tracks::ResultTitle(0);
+
+== Tracks::ResultId
+A search result's workshop id, as text (for `OpenWorkshop`).
+--
+string id = Tracks::ResultId(0);
+
+== Tracks::ResultImage
+A search result's preview picture as a file on this computer (for `Window.AddImage`), or `""` until there is one:
+asking for it starts the download, so ask again a moment later.
+--
+string image = Tracks::ResultImage(0);
+
+== Tracks::OpenWorkshop
+Opens a workshop track by its id. If it isn't on this computer yet, Steam downloads it first, as the game's own track
+browser does. False if it can't start; `OpenState` tells how it goes.
+--
+Tracks::OpenWorkshop(Tracks::ResultId(0));
+
+== Tracks::OpenState
+`"idle"`, `"downloading"`, `"opening"`, `"open"` or `"error: ..."`.
+--
+if (Tracks::OpenState().findFirst("error") == 0)
+    statusText.text = Tracks::OpenState();
+
+@@ Draw
+Shapes a plugin places in the world: tubes along a path and balls, in one colour, glowing or not. They have no
+collision and cast no shadow, belong to the plugin that made them, and go when it stops or the map changes.
+Everything here needs host 0.14.0.
+
+== Draw::Tube
+A tube along a path (x, y, z of each point, one after another), `radius` thick. Returns its id, or 0 if it couldn't
+be made. Colours are linear, 0 to 1. `opacity` below 1 makes it see-through, drawn as the game's tinted glass (it
+doesn't glow then).
+--
+int trail = Draw::Tube(path, 5, 0.2f, 0.6f, 1.0f, true);
+int faint = Draw::Tube(path, 5, 0.2f, 0.6f, 1.0f, false, 0.25f);    // a quarter opaque
+
+== Draw::Glow
+Changes a glowing shape's colour and brightness in place (`0` is dark; shapes are made at 8). For fading a shape
+in and out smoothly, without making it again. Requires host 0.14.0.
+--
+Draw::Glow(trail, 0.2f, 0.6f, 1.0f, 8 * fade);
+
+== Draw::Fade
+Changes a see-through shape's opacity in place (a shape made with an opacity below 1; `0` is invisible, `1` solid).
+For fading glass in and out without making it again. Requires host 0.14.0.
+--
+Draw::Fade(segment, 0.25f + 0.65f * (1 - age));
+
+== Draw::Ball
+A ball of that radius, at the world's origin until it's moved. Returns its id, or 0.
+--
+int ball = Draw::Ball(30, 1, 0.3f, 0.1f, true);
+Draw::Move(ball, x, y, z);
+
+== Draw::Move
+Puts a shape somewhere else: a ball's middle goes to the point; a tube moves by as much as its first placement.
+--
+Draw::Move(ball, x, y, z);
+
+== Draw::Show
+Shows or hides a shape.
+--
+Draw::Show(trail, false);
+
+== Draw::Remove
+Removes one shape.
+--
+Draw::Remove(trail);
+
+== Draw::Clear
+Removes every shape the plugin made.
+--
+Draw::Clear();
+
+@@ Camera
+Looking through a camera of your own, and where things are on screen. Everything here needs host 0.14.0.
+
+== Camera::Project
+Where a point in the world shows on screen, in the units windows are placed in (`Window.SetRect`). False when it's
+behind the camera.
+--
+float sx, sy;
+if (Camera::Project(x, y, z, sx, sy))
+    label.SetRect(sx - 80, sy - 26, 160, 26);
+
+== Camera::Take
+Makes the game look through your camera, starting where the game's camera is. False if another plugin has it.
+--
+Camera::Take();
+
+== Camera::Set
+Places your camera: where it is, which way it looks (degrees; pitch up and down, yaw around) and how wide (field of
+view, degrees).
+--
+Camera::Set(x, y, z, -30, 45, 80);
+
+== Camera::Release
+Goes back to the game's own view.
+--
+Camera::Release();
+
+== Camera::IsTaken
+Whether you have the camera.
+--
+if (Camera::IsTaken())
+    Camera::Set(x, y, z, pitch, yaw);
+
+@@ Math
+Math functions, in doubles, with the usual names. Angles are in radians.
+
+== Math::sin
+The sine of an angle.
+--
+double y = Math::sin(angle) * radius;
+
+== Math::cos
+The cosine of an angle.
+--
+double x = Math::cos(angle) * radius;
+
+== Math::tan
+The tangent of an angle.
+--
+double slope = Math::tan(angle);
+
+== Math::asin
+The angle whose sine this is.
+--
+double angle = Math::asin(0.5);
+
+== Math::acos
+The angle whose cosine this is.
+--
+double angle = Math::acos(0.5);
+
+== Math::atan
+The angle whose tangent this is.
+--
+double angle = Math::atan(slope);
+
+== Math::atan2
+The angle of the point (x, y) from the x axis: `atan2(y, x)`, in the right quarter.
+--
+double yaw = Math::atan2(dy, dx) * 180 / 3.14159265;
+
+== Math::sqrt
+The square root.
+--
+double distance = Math::sqrt(dx * dx + dy * dy);
+
+== Math::pow
+A number to a power.
+--
+double cubed = Math::pow(x, 3);
+
+== Math::abs
+The size of a number, without its sign.
+--
+double gap = Math::abs(a - b);
+
+== Math::floor
+The whole number at or below.
+--
+int whole = int(Math::floor(x));
+
+== Math::ceil
+The whole number at or above.
+--
+int pages = int(Math::ceil(count / 10.0));

@@ -24,6 +24,7 @@
 //   Spheres, boxes, discs, rings and saws are centred on "at"; cylinders, cones, capsules and cups stand on it (along
 //   +z). Rings and saws lie flat (around z).
 #pragma once
+#include <array>
 #include <string>
 #include <vector>
 
@@ -88,5 +89,26 @@ struct Built {
 Built Build(const Model& model, eng::Obj parent);
 void Animate(const Model& model, Built& built, eng::Obj ballActor, double seconds);
 void Destroy(Built& built);
+
+// Shapes in the world, for drawing (ghost trails and balls): a mesh actor on its own (not attached, no collision) in
+// one colour, glowing or plastic. Null when it could not be made.
+struct Colour {
+    float r = 1, g = 1, b = 1;          // linear
+    bool glow = false;
+    float bright = 5;
+    float opacity = 1;                  // below 1: see-through, as tinted glass (M_Glass) of the colour
+};
+eng::Obj SpawnTube(const std::vector<std::array<double, 3>>& path, double radius, const Colour& colour);   // along the points
+eng::Obj SpawnBall(double radius, const Colour& colour);
+// An empty mesh actor in this colour (tinted glass when see-through), and a tube added to one: many tubes in one mesh
+// are one object to draw. sides: of the tube's cross-section.
+eng::Obj SpawnMesh(const Colour& colour);
+bool AppendTube(eng::Obj actor, const std::vector<std::array<double, 3>>& path, double radius, int sides);
+// A shape's dynamic material (SpawnTube/SpawnBall), and that material given another colour and brightness (a glowing
+// shape) or opacity (a see-through one), in place.
+eng::Obj GlowMaterial(eng::Obj actor);
+eng::Obj NewGlowMaterial(float r, float g, float b, float bright);     // a new dynamic glow material of that colour
+bool SetGlow(eng::Obj material, float r, float g, float b, float bright);
+bool SetOpacity(eng::Obj material, float opacity);
 
 }  // namespace models

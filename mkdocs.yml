@@ -78,6 +78,11 @@ nav:
       - Hud: reference/api/hud.md
       - Cosmetics: reference/api/cosmetics.md
       - Leaderboard: reference/api/leaderboard.md
+      - Ghosts: reference/api/ghosts.md
+      - Tracks: reference/api/tracks.md
+      - Draw: reference/api/draw.md
+      - Camera: reference/api/camera.md
+      - Math: reference/api/math.md
       - Plugins: reference/api/plugins.md
       - Settings: reference/api/settings.md
       - Registry: reference/api/registry.md
