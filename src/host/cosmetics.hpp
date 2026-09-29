@@ -14,6 +14,10 @@
 //   * the game saves the page's choice to the profile, which is also what multiplayer is told: a custom asset there
 //     is saved as a path no later session can load (measured: the ball came back with no material). So the save keeps
 //     the game's own choice, and the host puts the custom one on the player's own balls and checkpoints.
+//   * public and local: the page gets "public" and "local" buttons. Public picks are the game's own (saved, seen by
+//     others and on hiscores); local picks, any game cosmetic or custom one, are worn on the player's own balls only and
+//     are kept in cosmetics_local.txt (game ones; custom ones are kept by the plugin that restores them). The page opens
+//     in public mode, with the custom section hidden.
 // Game thread only.
 #pragma once
 #include <string>
@@ -48,6 +52,7 @@ void Frame();                   // the custom section on the Customize page, and
 std::string Status();           // for the test channel
 std::vector<eng::Obj> ModelActorsOn(eng::Obj ball);    // the models built on this ball (its sphere and hat slot)
 bool ClickTile(int index);      // test: presses a custom tile of the section on screen (-n: the game's n-th), as a click does
+bool SetLocalMode(bool local);  // test: the Customize page's public/local mode, as its buttons set it; false with no page
 
 // Engine helpers the cosmetics need, usable elsewhere.
 eng::Obj LoadAsset(const std::wstring& path);      // an asset by object path, loaded if it is not in memory

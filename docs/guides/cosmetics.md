@@ -29,9 +29,17 @@ The functions are the same as [Cosmetics](../reference/api/cosmetics.md) in the 
 
 ## Who sees them
 
-Custom cosmetics are worn on the player's own ball only: the menu ball and the ball they race with. The game's save,
-and what other players see, keep the last cosmetic chosen from the game's own. That way removing a plugin never leaves
-the profile pointing at something that no longer exists.
+The Customize page has two buttons beside the cosmetics panel, **public** and **local**, each showing the ball and hat
+it stands for:
+
+- **Public** is the game's own choice: saved to the profile, shown to other players and recorded with hiscores. Only
+  the game's cosmetics can be picked here. The page opens in public mode.
+- **Local** is worn on the player's own ball only: the menu ball and the ball they race with. Any cosmetic can be
+  picked here, the game's or a custom one, for balls, hats and goal explosions. Picking the public one again makes
+  local match public.
+
+Custom cosmetics are always local, so the section of custom ones shows in local mode only. That way removing a plugin
+never leaves the profile pointing at something that no longer exists.
 
 ## Ball textures
 

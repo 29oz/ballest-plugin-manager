@@ -427,6 +427,9 @@ void Run(const std::string& cmd) {
         {"cosmetictile", [](const Args& a, const std::string& c) {
              Report(c + (cosmetics::ClickTile(std::atoi(Arg(a, 1).c_str())) ? " -> ok" : " -> failed"));
          }},
+        {"cosmode", [](const Args& a, const std::string& c) {      // cosmode public|local: the Customize page's mode
+             Report(c + (cosmetics::SetLocalMode(Arg(a, 1) == "local") ? " -> ok" : " -> no page"));
+         }},
         {"children", [](const Args& a, const std::string&) {       // children <owner class> <property>: a panel's children
              const auto owners = Instances(Arg(a, 1), "Transient");
              if (owners.empty()) return Report("children: no " + Arg(a, 1));
