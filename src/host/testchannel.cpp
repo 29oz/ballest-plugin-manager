@@ -354,6 +354,10 @@ void Run(const std::string& cmd) {
         {"editor", [](const Args& a, const std::string&) {
              if (Arg(a, 1) == "rotatecontext") editor::ForceRotateContext(Arg(a, 2) == "on");
              if (Arg(a, 1) == "pieces") return Report(editor::PiecesStatus());
+             if (Arg(a, 1) == "budget") {                   // editor budget [limit]: used of limit, and set the limit
+                 if (a.size() > 2) editor::SetBudgetLimit(-2, std::atoi(Arg(a, 2).c_str()));
+                 return Report("editor budget " + std::to_string(editor::BudgetUsed()) + " of " + std::to_string(editor::BudgetLimit()));
+             }
              if (Arg(a, 1) == "screen") {                   // editor screen <id>: where the piece's middle is, in window pixels
                  double x = 0, y = 0;
                  const bool on = editor::ScreenPosition(std::atoi(Arg(a, 2).c_str()), &x, &y);

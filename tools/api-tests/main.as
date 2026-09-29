@@ -1768,6 +1768,16 @@ void RegisterEditor()
         }
         return Is(Editor::ToolbarChoice(choice) == 1, "Editor::ToolbarChoice " + Editor::ToolbarChoice(choice) + " after Editor::SetToolbarChoice(1)");
     }, 10);
+    Add("editor", "Editor piece budget", "Editor::BudgetLimit,Editor::BudgetUsed,Editor::SetBudgetLimit", function() {
+        int own = Editor::BudgetLimit();
+        int used = Editor::BudgetUsed();
+        array<string> c = {Is(own > 0, "Editor::BudgetLimit " + own),
+                           Is(used > 0 && used <= int(Editor::Pieces().length()), "Editor::BudgetUsed " + used + " with " + Editor::Pieces().length() + " pieces"),
+                           Is(Editor::SetBudgetLimit(own + 1234) && Editor::BudgetLimit() == own + 1234, "Editor::SetBudgetLimit: limit " + Editor::BudgetLimit() + " after setting " + (own + 1234))};
+        Editor::SetBudgetLimit(0);
+        c.insertLast(Is(Editor::BudgetLimit() == own, "Editor::SetBudgetLimit(0): limit " + Editor::BudgetLimit() + ", want the game's " + own));
+        return All(c);
+    });
     Add("editor", "Editor clicks", "Editor::NextClick", function() {
         int p, flags;
         bool was;

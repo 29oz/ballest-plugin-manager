@@ -85,7 +85,13 @@ void SetToolbarChoiceSelected(int choice, int selected);
 // A row of the editor's key list: a key image (game texture path or PNG file) and what the key does; with a second
 // image the row reads "first + second" (a modifier and a key or mouse button).
 void AddHotkey(int owner, const std::string& icon, const std::string& label, const std::string& secondIcon = "");
-void RemoveOwner(int owner);            // a plugin's toolbar choices and key rows
+void RemoveOwner(int owner);            // a plugin's toolbar choices and key rows, and its budget limit
+// The map's piece budget: its limit (the level editor's MaximumMapBudget, read from the game: 300) and what the map
+// uses (the handler's AllocatedBudget, -1 outside the editor). SetBudgetLimit changes the limit for the session, for
+// the plugin that set it; 0 gives the game's own back, as does the plugin stopping.
+int BudgetLimit();
+int BudgetUsed();
+bool SetBudgetLimit(int owner, int limit);
 void ForceRotateContext(bool on);       // test hook: treat rotations as user rotations without a mouse drag
 
 eng::Obj DetailsContainer();            // where plugin sections are added in the details panel, or null

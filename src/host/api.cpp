@@ -457,6 +457,7 @@ int EditorAddToolbarChoice(const std::string& icon, const CScriptArray* options,
     for (asUINT i = 0; options && i < options->GetSize(); ++i) list.push_back(*static_cast<const std::string*>(options->At(i)));
     return list.empty() ? -1 : editor::AddToolbarChoice(plugins::Current(), IconPath(icon), list, selected);
 }
+bool EditorSetBudgetLimit(int limit) { return editor::SetBudgetLimit(plugins::Current(), limit); }
 void EditorAddHotkey(const std::string& icon, const std::string& label, const std::string& second) {
     editor::AddHotkey(plugins::Current(), IconPath(icon), label, second.empty() ? "" : IconPath(second));
 }
@@ -856,6 +857,9 @@ void RegisterEditor() {
     Global("int ToolbarChoice(int)", asFUNCTION(editor::ToolbarChoiceSelected));
     Global("void SetToolbarChoice(int, int)", asFUNCTION(editor::SetToolbarChoiceSelected));
     Global("void AddHotkey(const string &in, const string &in, const string &in = \"\")", asFUNCTION(EditorAddHotkey));
+    Global("int BudgetLimit()", asFUNCTION(editor::BudgetLimit));
+    Global("int BudgetUsed()", asFUNCTION(editor::BudgetUsed));
+    Global("bool SetBudgetLimit(int)", asFUNCTION(EditorSetBudgetLimit));
 }
 
 // --- Cosmetics -----------------------------------------------------------------------------------------------------

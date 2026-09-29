@@ -1178,7 +1178,39 @@ void AddHotkey(int owner, const std::string& icon, const std::string& label, con
     gHotkeys.push_back(h);
 }
 
+// --- the budget's limit ---------------------------------------------------------------------------------------------------
+// The level editor reads its limit from its developer settings (USKGMLEDeveloperSettings, whose default object holds
+// the project's values: MaximumMapBudget 300, read in game), so the limit is changed there; the game's own is kept to
+// give back.
+int gGameBudgetLimit = -1, gBudgetOwner = -1;
+
+Obj BudgetSettings() { return eng::FindCdo("SKGMLEDeveloperSettings"); }
+
+int BudgetLimit() {
+    int32_t limit = -1;
+    Obj settings = BudgetSettings();
+    return settings && eng::ReadBytes(settings, "MaximumMapBudget", &limit, sizeof limit) ? limit : -1;
+}
+
+int BudgetUsed() {
+    int32_t used = -1;
+    return Handler() && eng::ReadBytes(Handler(), "AllocatedBudget", &used, sizeof used) ? used : -1;
+}
+
+bool SetBudgetLimit(int owner, int limit) {
+    Obj settings = BudgetSettings();
+    if (!settings) return false;
+    if (gGameBudgetLimit < 0) gGameBudgetLimit = BudgetLimit();
+    if (gGameBudgetLimit < 0) return false;
+    const int32_t value = limit > 0 ? limit : gGameBudgetLimit;
+    if (!eng::WriteBytes(settings, "MaximumMapBudget", &value, sizeof value)) return false;
+    gBudgetOwner = limit > 0 ? owner : -1;
+    hostlog::Info("editor: piece budget limit " + std::to_string(value) + (limit > 0 ? "" : " (the game's own)"));
+    return true;
+}
+
 void RemoveOwner(int owner) {
+    if (owner == gBudgetOwner) SetBudgetLimit(owner, 0);
     for (auto& c : gChoices)
         if (c.owner == owner && !c.removed) {
             if (Obj w = eng::Get(c.widget)) eng::Call(w, "RemoveFromParent");
