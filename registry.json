@@ -168,11 +168,11 @@
     }
   ],
   "host": {
-    "version": "0.13.1",
+    "version": "0.14.0",
     "repo": "AnythingGoes-ballest/ballest-plugin-manager",
-    "commit": "2972ca2dbe46d309903c8762905f19991e676b9a",
-    "dll": "https://github.com/AnythingGoes-ballest/ballest-plugin-manager/releases/download/v0.13.1/version.dll",
-    "dll_sha256": "82d659ac6d7ca8df71843153addeb43969232d8a8e29c8140d22c20402367b00",
+    "commit": "3e85f57dfd8f76a45c0358ee32f36d4c09ad4764",
+    "dll": "https://github.com/AnythingGoes-ballest/ballest-plugin-manager/releases/download/v0.14.0/version.dll",
+    "dll_sha256": "b867395c46c6fbc1f4067171426bc6d91f7f8f078cafa06efa86d8293a2673ef",
     "files": {
       "plugins/hello-world/info.toml": "5300e78277bc1e92d4d1626ce17ed15e938f37e692b2271b58c3c9c30b79be40",
       "plugins/hello-world/main.as": "24f510821cb3ea7825bfef6363d92e12fd493b9977038beb9e6c297a692fb23b",
