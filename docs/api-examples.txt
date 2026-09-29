@@ -856,8 +856,9 @@ if (counting)
 else
     timeText.SetColor(0.16f, 0.55f, 0.24f, 1);
 
-== UI::Text.visible UI::Button.visible UI::Slider.visible UI::Dropdown.visible UI::TextArea.visible UI::TextInput.visible UI::Image.visible UI::CheckBox.visible
-Whether the widget is shown. A hidden widget takes no space, so the rest of its row closes up.
+== UI::Text.visible UI::Button.visible UI::Slider.visible UI::Dropdown.visible UI::TextArea.visible UI::TextInput.visible UI::Image.visible UI::CheckBox.visible UI::Rect.visible
+Whether the widget is shown. A hidden widget takes no space, so the rest of its row closes up (placed items, such as
+rectangles, are simply not drawn).
 --
 // Buttons only while the cursor is on screen
 pauseButton.visible = UI::CursorShown();
