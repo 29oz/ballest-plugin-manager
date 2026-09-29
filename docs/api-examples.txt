@@ -77,6 +77,13 @@ the screen. Requires host 0.15.0.
 if (!Host::WindowFitsScreen())
     Host::MaximizeWindow();
 
+== Host::MaximizeAtStart
+Asks the host to maximize the game's window at the next starts, as soon as the window appears, seconds before any
+plugin runs: `0` off, `1` when it doesn't fit the screen, `2` always. Kept until changed, and only while the plugin is
+installed and not turned off. Requires host 0.15.1.
+--
+Host::MaximizeAtStart(AlwaysMaximize ? 2 : 1);
+
 == Host::MaximizeWindow
 Maximizes the game's window (a bordered one; fullscreen and borderless are left alone), as double-clicking its title
 bar does. True if it's maximized now. Requires host 0.15.0.
@@ -1007,6 +1014,13 @@ if (command.Submitted())
 --
 if (nameInput.Submitted())
     Storage::Set("name", nameInput.text);
+
+== UI::TextInput.typed
+**Read only.** What's in the box now, as it's typed (without waiting for Enter): for a search that filters as you
+type. Requires host 0.15.1.
+--
+if (search.typed != shownSearch)
+    Filter(search.typed);
 
 == UI::TextInput.focused
 **Read only.** Whether the box has keyboard focus (the player is typing in it).

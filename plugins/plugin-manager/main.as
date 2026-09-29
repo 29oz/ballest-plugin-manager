@@ -8,7 +8,10 @@
 //   console    the host log as it is written, and host commands (find, props, functions, ...; the full list is in
 //              src/host/testchannel.hpp): type one and press Enter, or click run. "show" filters the log: everything,
 //              only the commands typed here and their replies, the host, or one plugin.
-//   Escape goes up one level: a settings page back to the installed tab, a tab out of the menu.
+//   search     on the installed and browse tabs: the cards whose name has every word typed, anywhere in it (the
+//              middle of a word too), filtered as you type. Titles where the words start a word come first.
+//   Escape goes up one level: a search typed is cleared, a settings page goes back to the installed tab, a tab out of
+//   the menu.
 //   settings   opened from a plugin's card: that plugin's [Setting] variables (a slider and a text box for a number
 //              with min and max, on/off for a bool, a text box otherwise, each with reset), and "reset position"
 //              when it has windows that can be dragged.
@@ -33,6 +36,8 @@ UI::Button@ installedTab;
 UI::Button@ browseTab;
 UI::Button@ consoleTab;
 UI::Button@ folderButton;
+UI::TextInput@ searchInput;
+string shownSearch;             // the search the cards were built for
 UI::Button@ closeButton;
 int installedView = -1;
 int browseView = -1;
@@ -110,6 +115,9 @@ void BuildMenu()
     @installedTab = menu.AddButton("installed");
     @browseTab = menu.AddButton("browse");
     @consoleTab = menu.AddButton("console");
+    menu.AddSpace(20);
+    @searchInput = menu.AddTextInput(300, "search plugins", 17);
+    searchInput.clearOnSubmit = false;
     menu.AddSpace(0);
     @folderButton = menu.AddButton("open plugins folder");
     @closeButton = menu.AddButton("close");
@@ -147,6 +155,7 @@ void ShowView(int view)
     Tab(installedTab, view == installedView || view == settingsView);
     Tab(browseTab, view == browseView);
     Tab(consoleTab, view == consoleView);
+    searchInput.visible = view == installedView || view == browseView;
     if (view == consoleView)
         commandInput.Focus();
 }
@@ -309,6 +318,73 @@ int InstalledIndex(const string &in id)
         if (Plugins::Id(i) == id)
             return int(i);
     return -1;
+}
+
+// --- search ---------------------------------------------------------------------------------------------------------
+
+string Lower(const string &in text)
+{
+    string t = text;
+    for (uint i = 0; i < t.length(); i++)
+        if (t[i] >= 65 && t[i] <= 90)
+            t[i] = t[i] + 32;
+    return t;
+}
+
+string WithoutSpaces(const string &in text)
+{
+    string t;
+    for (uint i = 0; i < text.length(); i++)
+        if (text[i] != 32 && text[i] != 45 && text[i] != 95)     // space, - and _
+            t += text.substr(i, 1);
+    return t;
+}
+
+// How well a name matches what's typed: -1 not at all, else higher first. Every word typed must be somewhere in the
+// name (the middle of a word counts: "timer" and "rind" both find Grind Timer), or in it with its spaces left out
+// ("grindtimer"). A word that starts one of the name's words scores more than one found in the middle.
+int SearchScore(const string &in name, const string &in query)
+{
+    string n = Lower(name), bare = WithoutSpaces(n);
+    array<string>@ words = Lower(query).split(" ");
+    int score = 0, used = 0;
+    for (uint w = 0; w < words.length(); w++)
+    {
+        string word = words[w];
+        if (word == "")
+            continue;
+        used++;
+        int at = n.findFirst(word);
+        if (at < 0)
+        {
+            if (bare.findFirst(WithoutSpaces(word)) < 0)
+                return -1;
+            score += 1;
+            continue;
+        }
+        bool starts = at == 0 || n[at - 1] == 32 || n[at - 1] == 45;
+        score += starts ? (at == 0 ? 4 : 3) : 2;
+    }
+    return used == 0 ? 0 : score;
+}
+
+// The indices (0..count-1) of the names matching the search, best first; all of them in order when it's empty.
+array<uint> Matching(const array<string> &in names, const string &in query)
+{
+    array<uint> found;
+    array<int> scores;
+    for (uint i = 0; i < names.length(); i++)
+    {
+        int score = SearchScore(names[i], query);
+        if (score < 0)
+            continue;
+        uint at = found.length();
+        while (at > 0 && scores[at - 1] < score)
+            at--;
+        found.insertAt(at, i);
+        scores.insertAt(at, score);
+    }
+    return found;
 }
 
 // Everything the cards show, as one string: when it changes, the cards are rebuilt.
@@ -489,10 +565,19 @@ void BuildCards()
     cardButtons.resize(0);
     cardActions.resize(0);
 
+    shownSearch = searchInput.typed;
+    bool searching = WithoutSpaces(shownSearch) != "";
     menu.ClearView(installedView);
-    AddHostUpdateCard();
+    if (!searching)
+        AddHostUpdateCard();
+    array<string> installedNames;
     for (uint p = 0; p < Plugins::Count(); p++)
-        AddInstalledCard(p);
+        installedNames.insertLast(Plugins::Name(p));
+    array<uint> installedShown = Matching(installedNames, shownSearch);
+    for (uint k = 0; k < installedShown.length(); k++)
+        AddInstalledCard(installedShown[k]);
+    if (searching && installedShown.length() == 0)
+        Muted(menu.AddText("No installed plugin matches \"" + shownSearch + "\".", 17));
 
     menu.ClearView(browseView);
     string state = Registry::State();
@@ -500,17 +585,26 @@ void BuildCards()
     menu.AddSpace(0);
     @refreshButton = menu.AddButton("refresh");
     Secondary(refreshButton);
-    uint shown = 0;
+    array<uint> available;
+    array<string> availableNames;
     for (uint r = 0; r < Registry::Count(); r++)
         if (InstalledIndex(Registry::Id(r)) < 0)
         {
-            AddBrowseCard(r);
-            shown++;
+            available.insertLast(r);
+            availableNames.insertLast(Registry::Name(r));
         }
-    if (state == "ready" && shown == 0)
+    array<uint> browseShown = Matching(availableNames, shownSearch);
+    for (uint k = 0; k < browseShown.length(); k++)
+        AddBrowseCard(available[browseShown[k]]);
+    if (state == "ready" && available.length() == 0)
     {
         menu.NewRow();
         Muted(menu.AddText("Every plugin in the registry is installed.", 17));
+    }
+    else if (state == "ready" && browseShown.length() == 0)
+    {
+        menu.NewRow();
+        Muted(menu.AddText("No plugin to install matches \"" + shownSearch + "\".", 17));
     }
     shownCards = CardState();
 }
@@ -547,6 +641,9 @@ void UpdateCards()
         if (CardState() != shownCards)
             BuildCards();
     }
+    if (searchInput.typed != shownSearch)          // as it's typed, no Enter needed
+        BuildCards();
+    searchInput.Submitted();                       // Enter adds nothing: the cards already show what's typed
 }
 
 // --- one plugin's settings --------------------------------------------------------------------------------------
@@ -723,7 +820,9 @@ void UpdateMenu()
     // Escape goes up one level: from a plugin's settings page back to the installed tab, from a tab out of the menu.
     if (Input::Pressed(Input::Escape))
     {
-        if (shownView == settingsView)
+        if (searchInput.visible && searchInput.typed != "")
+            searchInput.value = "";
+        else if (shownView == settingsView)
             ShowView(installedView);
         else
             CloseMenu();

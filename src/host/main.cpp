@@ -176,6 +176,7 @@ DWORD WINAPI InitThread(LPVOID) {
         hostlog::Info("plugins\\DISABLED exists; host stays inactive");
         return 0;
     }
+    game::EarlyWindowFit(gGameDir);          // before the engine is up: the window appears long before plugins run
     if (!eng::Init(reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr)))) return 0;
     InstallFaultGuard();
     for (int attempt = 0; attempt < 600; ++attempt) {        // up to five minutes

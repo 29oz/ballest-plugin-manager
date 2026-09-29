@@ -2,6 +2,9 @@
 
 #include <cstring>
 #include <vector>
+#include <algorithm>
+#include <cstdio>
+#include <thread>
 
 #include <windows.h>
 
@@ -187,6 +190,79 @@ bool MaximizeWindow() {
     if (!w || (GetWindowLongW(w, GWL_STYLE) & WS_CAPTION) != WS_CAPTION) return false;
     ShowWindow(w, SW_MAXIMIZE);
     return IsZoomed(w) != 0;
+}
+
+namespace {
+std::wstring AtStartFile() { return hostlog::DataDir() + L"\\window_at_start.txt"; }
+
+std::vector<std::pair<std::string, int>> ReadAtStart() {
+    std::vector<std::pair<std::string, int>> entries;
+    FILE* f = _wfopen(AtStartFile().c_str(), L"r");
+    if (!f) return entries;
+    char id[256];
+    int mode = 0;
+    while (fscanf(f, "%255s %d", id, &mode) == 2) entries.push_back({id, mode});
+    fclose(f);
+    return entries;
+}
+
+bool FitsWorkArea(HWND w) {
+    RECT r;
+    MONITORINFO m{};
+    m.cbSize = sizeof m;
+    if (!GetWindowRect(w, &r) || !GetMonitorInfoW(MonitorFromWindow(w, MONITOR_DEFAULTTONEAREST), &m)) return true;
+    constexpr LONG kSlack = 12;         // the invisible resize borders (see WindowFitsScreen)
+    return r.left >= m.rcWork.left - kSlack && r.right <= m.rcWork.right + kSlack && r.top >= m.rcWork.top &&
+           r.bottom <= m.rcWork.bottom + kSlack;
+}
+}  // namespace
+
+void SetMaximizeAtStart(const std::string& pluginId, int mode) {
+    auto entries = ReadAtStart();
+    entries.erase(std::remove_if(entries.begin(), entries.end(), [&](const auto& e) { return e.first == pluginId; }), entries.end());
+    if (mode > 0) entries.push_back({pluginId, mode});
+    FILE* f = _wfopen(AtStartFile().c_str(), L"w");
+    if (!f) return;
+    for (const auto& [id, m] : entries) fprintf(f, "%s %d\n", id.c_str(), m);
+    fclose(f);
+}
+
+// Runs on a thread of its own from the host's start, while the game is still loading: the window appears seconds
+// before any plugin can run (measured: Fit Window's own check maximized it only once the engine was up).
+void EarlyWindowFit(const std::wstring& gameDir) {
+    std::set<std::string> off;
+    if (FILE* f = _wfopen((hostlog::DataDir() + L"\\off.txt").c_str(), L"r")) {
+        char id[256];
+        while (fscanf(f, "%255s", id) == 1) off.insert(id);
+        fclose(f);
+    }
+    int mode = 0;
+    std::string by;
+    for (const auto& [id, m] : ReadAtStart()) {
+        const std::wstring folder = gameDir + L"\\plugins\\" + std::wstring(id.begin(), id.end());
+        if (off.count(id) || GetFileAttributesW(folder.c_str()) == INVALID_FILE_ATTRIBUTES) continue;
+        if (m > mode) {
+            mode = m;
+            by = id;
+        }
+    }
+    if (mode == 0) return;
+    std::thread([mode, by] {
+        const ULONGLONG start = GetTickCount64();
+        int maximized = 0;
+        // The game can resize its window again while it loads: watched for the first 30 s, maximized each time it
+        // stops fitting (at most three times, so a player un-maximizing it on purpose is left alone).
+        while (GetTickCount64() - start < 30000 && maximized < 3) {
+            Sleep(25);
+            HWND w = GameWindow();
+            if (!w || IsZoomed(w) || (GetWindowLongW(w, GWL_STYLE) & WS_CAPTION) != WS_CAPTION) continue;
+            if (mode == 1 && FitsWorkArea(w)) continue;
+            ShowWindowAsync(w, SW_MAXIMIZE);
+            ++maximized;
+            hostlog::Info("window maximized at start for " + by + ", " + std::to_string(GetTickCount64() - start) + " ms in");
+            Sleep(500);
+        }
+    }).detach();
 }
 
 bool ScreenSize(double* width, double* height) {

@@ -99,6 +99,7 @@ struct Widget {
     bool changedPending = false;
     bool checked = false, shownChecked = false;                             // check box (text is its label)
     std::string submitted;                                                  // text input: the last submitted text
+    std::string typed;                                                      // text input: what's in the box now
     bool clearOnSubmit = true;                                              // text input: empty the box after Enter
     bool readOnly = false, readOnlyPending = false;                         // text input: selectable, not editable
     std::string pendingValue;                                               // text input: text for the box
@@ -202,6 +203,7 @@ bool SimulateClick(const std::string& label);   // a footer or window button by 
 bool SimulateSelect(const std::string& firstOption, int index);     // a dropdown, found by its first option
 void SimulateSlider(float value);               // every slider reports this value as dragged, for one frame
 bool SimulateSubmit(const std::string& text);   // the first text input reports this text as submitted
+bool SimulateType(const std::string& text);     // the first (or "@hint|") text input gets this text as if typed
 std::string Status();
 
 namespace footer {
@@ -219,6 +221,7 @@ bool SimulateClick(const std::string& label);
 bool SimulateSelect(const std::string& firstOption, int index);
 void SimulateSlider(float value);
 bool SimulateSubmit(const std::string& text);
+bool SimulateType(const std::string& text);
 bool Typing();
 void RemoveOwner(int owner);
 void HideOwner(int owner);

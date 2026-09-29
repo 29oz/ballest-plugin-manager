@@ -5,6 +5,7 @@
 //
 //   state                                  UI and plugin status
 //   click <label>[#n] | select <first option> <index> | slider <0..1> | press <virtual key> | submit [@<hint>|]<text>
+//   | type [@<hint>|]<text> (put in the box as if typed, no Enter)
 //   fakereplay on [length] | fakereplay off | replaytime
 //   install <id> | remove <id>             through the registry, as the plugin browser's buttons do
 //   enable <id> 0|1                        turn a plugin off or on, as its card's button does

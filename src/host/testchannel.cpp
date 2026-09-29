@@ -312,6 +312,7 @@ void Run(const std::string& cmd) {
              Report(c);
          }},
         {"submit", [](const Args&, const std::string& c) { Report(c + (ui::SimulateSubmit(c.substr(7)) ? " -> ok" : " -> no text input")); }},
+        {"type", [](const Args&, const std::string& c) { Report(c + (ui::SimulateType(c.substr(5)) ? " -> ok" : " -> no text input")); }},
         {"press", [](const Args& a, const std::string& c) {
              input::Simulate(std::atoi(Arg(a, 1).c_str()));
              Report(c);

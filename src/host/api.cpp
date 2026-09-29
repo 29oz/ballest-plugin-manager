@@ -330,6 +330,8 @@ void DropdownSet(ui::Widget* w, int i) {
 bool DropdownChanged(ui::Widget* w) { return TakeFlag(w, &ui::Widget::changedPending); }
 bool InputSubmitted(ui::Widget* w) { return TakeFlag(w, &ui::Widget::submitPending); }
 std::string InputText(ui::Widget* w) { return w->submitted; }
+std::string InputTyped(ui::Widget* w) { return w->typed; }
+void HostMaximizeAtStart(int mode) { game::SetMaximizeAtStart(plugins::CurrentId(), mode); }
 bool InputFocused(ui::Widget* w) { return w->focused; }
 void InputFocus(ui::Widget* w) {
     w->focusRequested = true;
@@ -496,6 +498,7 @@ void RegisterCore() {
     Global("bool WindowMaximized()", asFUNCTION(game::WindowMaximized));
     Global("bool WindowFitsScreen()", asFUNCTION(game::WindowFitsScreen));
     Global("bool MaximizeWindow()", asFUNCTION(game::MaximizeWindow));
+    Global("void MaximizeAtStart(int mode)", asFUNCTION(HostMaximizeAtStart));
     Global("void OpenUrl(const string &in)", asFUNCTION(OpenUrl));
 
     e->SetDefaultNamespace("Plugins");
@@ -654,6 +657,7 @@ void RegisterUi() {
     Method("TextArea", "string get_text() property", asFUNCTION(GetWidgetText));
     Method("TextInput", "bool Submitted()", asFUNCTION(InputSubmitted));
     Method("TextInput", "string get_text() property", asFUNCTION(InputText));
+    Method("TextInput", "string get_typed() property", asFUNCTION(InputTyped));
     Method("TextInput", "bool get_focused() property", asFUNCTION(InputFocused));
     Method("TextInput", "void Focus()", asFUNCTION(InputFocus));
     Method("TextInput", "void Submit()", asFUNCTION(InputSubmit));

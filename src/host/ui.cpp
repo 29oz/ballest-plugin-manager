@@ -16,6 +16,7 @@ bool SimulateClick(const std::string& label) {
 bool SimulateSelect(const std::string& firstOption, int index) { return windows::SimulateSelect(firstOption, index); }
 void SimulateSlider(float value) { windows::SimulateSlider(value); }
 bool SimulateSubmit(const std::string& text) { return windows::SimulateSubmit(text); }
+bool SimulateType(const std::string& text) { return windows::SimulateType(text); }
 bool Typing() { return windows::Typing(); }
 
 void RemoveOwner(int owner) {

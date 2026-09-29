@@ -631,6 +631,7 @@ void Sync(Widget& item) {
         case Kind::TextInput: {
             if (item.valuePending) {
                 w::SetText(main, item.pendingValue);
+                item.typed = item.pendingValue;
                 item.valuePending = false;
             }
             if (item.readOnlyPending) {
@@ -638,6 +639,7 @@ void Sync(Widget& item) {
                 item.readOnlyPending = false;
             }
             item.focused = eng::Call(main, "HasKeyboardFocus").ReturnBool();
+            if (item.focused) item.typed = w::ReadText(main);      // live, for filtering as you type
             // Focus can only be taken once the box is on screen, so it is asked for until it sticks.
             if (item.focusRequested) {
                 if (item.focused || ++item.focusAttempts > kFocusAttempts) item.focusRequested = false;
@@ -958,6 +960,22 @@ bool SimulateSubmit(const std::string& command) {
             if (!item->retired && item->kind == Kind::TextInput && item->text.find(hint) != std::string::npos) {
                 item->submitted = text;
                 return item->submitPending = true;
+            }
+    return false;
+}
+
+bool SimulateType(const std::string& command) {
+    // As SimulateSubmit, but the text is put in the box as if typed (no Enter): for live searches.
+    std::string hint, text = command;
+    if (command.rfind("@", 0) == 0 && command.find('|') != std::string::npos) {
+        hint = command.substr(1, command.find('|') - 1);
+        text = command.substr(command.find('|') + 1);
+    }
+    for (auto& win : gWindows)
+        for (auto& item : win->items)
+            if (!item->retired && item->kind == Kind::TextInput && item->text.find(hint) != std::string::npos) {
+                item->pendingValue = text;
+                return item->valuePending = true;
             }
     return false;
 }

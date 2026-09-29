@@ -33,6 +33,11 @@ bool ScreenSize(double* width, double* height);
 bool WindowMaximized();
 bool WindowFitsScreen();
 bool MaximizeWindow();
+// Maximizing the window at the next starts (0 off, 1 when it doesn't fit, 2 always), asked for by a plugin: saved in
+// window_at_start.txt as "<plugin id> <mode>". At a start, before any plugin runs, the host watches for the game's
+// window and maximizes it at once for any such plugin still installed and not turned off (EarlyWindowFit).
+void SetMaximizeAtStart(const std::string& pluginId, int mode);
+void EarlyWindowFit(const std::wstring& gameDir);
 
 // The text input being typed in, or null. While there is one, input is UI-only with it focused: the game's
 // viewport ignores keys, so the player controller (whose "any key" event moves menu focus) and the pawn never

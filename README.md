@@ -3,9 +3,10 @@
 ## About
 
 A plugin manager for **Ballest of Them All**, like Openplanet for Trackmania. It adds a **plugins** button to the
-game's footer, where you can browse, install, update and remove plugins without leaving the game.
+game's footer, where you can browse, search, install, update and remove plugins without leaving the game.
 
 - Plugins are small scripts: timers, replay controls, track editor tools, and more.
+- Search the installed plugins and the ones to install as you type: any word of a name finds it, even from the middle.
 - Every download is checked against a SHA-256 hash before it's installed.
 - A plugin that crashes or hangs is stopped on its own. The game keeps running.
 - No UE4SS or other mod loader needed.
