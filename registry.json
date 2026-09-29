@@ -1,6 +1,31 @@
 {
   "plugins": [
     {
+      "id": "clear-tec-balls",
+      "name": "Clear-Tec-Balls",
+      "description": "Cosmetic Kit: Glass-Ball",
+      "author": "CryT4x",
+      "repo": "Cryt4x/ballest-clear-tec-balls",
+      "version": "1.0.4",
+      "commit": "6587e97e4cd09bb808e07d06ec2c3ba3d88a06e7",
+      "min_host": "0.8.0",
+      "icon": "icon.png",
+      "dependencies": [
+        "cosmetic-kit"
+      ],
+      "files": {
+        "info.toml": "f4ec9f2f3b6a930a6da6a41323a44e594a232908ecff77f2593b75c18deca7cf",
+        "main.as": "96c41dd4296d71b37a618569db6865fdc5488d4e52e9519414543b5dcbf358a0",
+        "coors_preview.png": "65c103f1148e28b55a6d52706839514e20f5671438df50f6345f0ac48d52532b",
+        "dots_preview.png": "de290fb12b605c6b71e3e7c1af144ebedfd7620987c2582b2c18bbd2d93cd84d",
+        "glass_preview.png": "74dd19f942d4c9e11baf102180e224747096f561bfa7abdf9f4bbb5477142c84",
+        "icon.png": "b10fcaa29751da5e6e0f8ddf6625165238bfa41615c614c9453c73a83265e7ef",
+        "models/coors_hat.txt": "6277f67b287939bfb2564196e2b97308d1eb3abf922a1f2b6a8d3b5b334d72de",
+        "models/dots.txt": "1733a1a9bfb2dd3f2ce33af49555d13333d50ca8f1383caa0446ae7d30f70fe8",
+        "models/glass.txt": "5621b229ec19b179d2caccbea2d6df311553488d5797f0ea182fc86c82d87254"
+      }
+    },
+    {
       "id": "cosmetic-kit",
       "name": "Cosmetic Kit",
       "description": "Lets plugins add custom balls, hats and goal explosions to a custom section of the Customize page, and remembers which ones you wear.",
