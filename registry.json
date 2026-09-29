@@ -64,33 +64,42 @@
     {
       "id": "example-cosmetics",
       "name": "Example Cosmetics",
-      "description": "Examples for Cosmetic Kit: smiley, AnythingGoes, morph ball and saw meatball balls, a fruit basket hat and a confetti goal explosion.",
+      "description": "Examples for Cosmetic Kit: smiley, AnythingGoes, morph ball, saw meatball, T-rex and skeleton balls, fruit basket and baseball cap hats, and a confetti goal explosion.",
       "author": "AnythingGoes",
       "repo": "AnythingGoes-ballest/ballest-example-cosmetics",
-      "version": "0.2.0",
-      "commit": "e5471b21b1ac046acdf88c30976d04cfff62a029",
-      "min_host": "0.8.0",
+      "version": "0.3.0",
+      "commit": "721c56aa2ce5e859e5d6badaec9cb3a2e197264b",
+      "min_host": "0.16.0",
       "icon": "icon.png",
       "dependencies": [
         "cosmetic-kit"
       ],
       "files": {
-        "info.toml": "1cb3d290ff5077e2e4d6e4864df911a1d89eb192c40da16a5c15fc947dfc8224",
-        "main.as": "fb1832466efbd95a2137de41d0d610c7684439f0e76fcc6c457d52163139cf5b",
+        "info.toml": "d6a04440dbe53e5d446414c38775a2a4ab3d28a8f3572c96cb687c8a5e35b244",
+        "main.as": "0f62e74c93185b48a698fbd726b696dab13d516113462604e77ab03d8810dbf9",
         "anythinggoes_ball.png": "f6b8321d494c77f66bd0090f1e3db13ab2cad6758cecfb8b87c7e173362715f9",
         "anythinggoes_preview.png": "d5d40b3bcf7b84e63b38ca6d64a0d21f2d30d665f3ccfa2772c11fa24fbf05fe",
         "basket_preview.png": "b75bcd038614fcb514efa59f8d614d13e58ae739178ace0f06029a853ea618bb",
+        "cap_preview.png": "97e706c1927366516fc784470ace458c1346ef6f4e48100f77a7c0a5d24a56c0",
         "confetti_preview.png": "0373384c468e6b46d2b8c32b3e02b0cd351e13931dd1916b9c9834b8322247b4",
         "icon.png": "1e165f688871adb5cc9dbda6a7cf679ece8564c275cacee8fc3d47073df93ee6",
         "meatball.png": "1218aa065ffd8840a91518cd98ce316680ceb35a88a3036839642ce705d2b68a",
         "meatball_preview.png": "61711a1ea276a1091f19a793383d6d1963fe9d8829e0bdf7804370f47f6d62ed",
         "morph_ball.png": "3c4f3e753904c28163345d1fe588381b860622b8782449f5f359c22ef9b799f8",
         "morph_preview.png": "461c42fea68a8cfb65e570a05b642fc85001a23816ac920ea4592b3bb17ab743",
+        "skeleton_preview.png": "1a00c7bcc7ca692e2def7765cf13c026246040e33f57ba6b16cd715cd02957bc",
         "smiley_ball.png": "73e9538e35401568ceb914371966c2238d05a2cb823d36df4ea909792779b6f4",
         "smiley_preview.png": "1e165f688871adb5cc9dbda6a7cf679ece8564c275cacee8fc3d47073df93ee6",
+        "trex_preview.png": "58b25386ef8f191403ee0602fc623a7e732fcd45bd4d1f1f4086306a717cc86d",
+        "models/cap.txt": "fec9f581e0ad55d55e5622024205928ccffde2e499bb510b9d2db81fa12c01e2",
         "models/fruit_basket.txt": "66aa84a19dffd2cbbe277ea4c6d48e19c865d5a9ec109dd7235eaeebc94a3bd3",
         "models/morph_ball.txt": "cca1b2f5a3fee9f7eae4c30cb6a69c3a3eb0304de93376069c114bd9ce65d754",
-        "models/saw_ball.txt": "45f8c5b1f5d2b9aa6f1cef7d0fb74d7297dd049c679e8a2706e2ef11ac41cd1c"
+        "models/saw_ball.txt": "45f8c5b1f5d2b9aa6f1cef7d0fb74d7297dd049c679e8a2706e2ef11ac41cd1c",
+        "models/skeleton_ball.txt": "177753827d6b5db61309f25576580e0c93441f8ec5fa47a6b90200ce2e428ccf",
+        "models/trex_ball.txt": "c38fe5f98e36333105334161857b8e882afeb6b53977aecc7f4c2a276c95d767",
+        "models/cap.glb": "d08b29aec2d1d62a5076e20d9933ea6efd7ee23f7744387d66028950fe8968c3",
+        "models/skeleton.glb": "f37447614f66e40147f91e2ea094d49946913fe7ead1a5ae5a7c99a0471269c1",
+        "models/trex.glb": "53e58350f3843f3d36affcb49726f60e0825f75b94b0c64d863333c843d26f80"
       }
     },
     {
@@ -209,11 +218,11 @@
     }
   ],
   "host": {
-    "version": "0.15.3",
+    "version": "0.16.0",
     "repo": "AnythingGoes-ballest/ballest-plugin-manager",
-    "commit": "a86865fde86423332a93e10b46c84fb642815634",
-    "dll": "https://github.com/AnythingGoes-ballest/ballest-plugin-manager/releases/download/v0.15.3/version.dll",
-    "dll_sha256": "6f8620a1672367fca72a12f190b065aa3617c7b71c47b3b96365a4124eb2b69b",
+    "commit": "abc11b47a710de16f7c2353e38a50cb9f2e5f0a0",
+    "dll": "https://github.com/AnythingGoes-ballest/ballest-plugin-manager/releases/download/v0.16.0/version.dll",
+    "dll_sha256": "09ef350c69a2096a4e14ce3bb4506f79d1aeb39ae07c911532affeb7665cd0c4",
     "files": {
       "plugins/hello-world/info.toml": "5300e78277bc1e92d4d1626ce17ed15e938f37e692b2271b58c3c9c30b79be40",
       "plugins/hello-world/main.as": "24f510821cb3ea7825bfef6363d92e12fd493b9977038beb9e6c297a692fb23b",
