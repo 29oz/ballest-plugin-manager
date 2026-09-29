@@ -935,14 +935,17 @@ bool SimulateClick(const std::string& label) {
 }
 
 bool SimulateSelect(const std::string& firstOption, int index) {
-    for (auto& win : gWindows)
-        for (auto& item : win->items)
-            if (!item->retired && item->kind == Kind::Dropdown && !item->options.empty() && item->options[0] == firstOption && index >= 0 &&
-                index < static_cast<int>(item->options.size())) {
-                item->selected = index;
-                item->changedPending = true;
-                return true;
-            }
+    // Windows on screen first: a hidden window of another plugin can have a dropdown with the same options.
+    for (int pass = 0; pass < 2; ++pass)
+        for (auto& win : gWindows)
+            if (pass == 1 || win->shownVisible)
+                for (auto& item : win->items)
+                    if (!item->retired && item->kind == Kind::Dropdown && !item->options.empty() && item->options[0] == firstOption &&
+                        index >= 0 && index < static_cast<int>(item->options.size())) {
+                        item->selected = index;
+                        item->changedPending = true;
+                        return true;
+                    }
     return false;
 }
 
@@ -955,12 +958,14 @@ bool SimulateSubmit(const std::string& command) {
         hint = command.substr(1, command.find('|') - 1);
         text = command.substr(command.find('|') + 1);
     }
-    for (auto& win : gWindows)
-        for (auto& item : win->items)
-            if (!item->retired && item->kind == Kind::TextInput && item->text.find(hint) != std::string::npos) {
-                item->submitted = text;
-                return item->submitPending = true;
-            }
+    for (int pass = 0; pass < 2; ++pass)      // text inputs on screen first (a hidden search box comes before a console)
+        for (auto& win : gWindows)
+            if (pass == 1 || win->shownVisible)
+                for (auto& item : win->items)
+                    if (!item->retired && item->kind == Kind::TextInput && (pass == 1 || item->visible) && item->text.find(hint) != std::string::npos) {
+                        item->submitted = text;
+                        return item->submitPending = true;
+                    }
     return false;
 }
 
@@ -971,12 +976,14 @@ bool SimulateType(const std::string& command) {
         hint = command.substr(1, command.find('|') - 1);
         text = command.substr(command.find('|') + 1);
     }
-    for (auto& win : gWindows)
-        for (auto& item : win->items)
-            if (!item->retired && item->kind == Kind::TextInput && item->text.find(hint) != std::string::npos) {
-                item->pendingValue = text;
-                return item->valuePending = true;
-            }
+    for (int pass = 0; pass < 2; ++pass)      // text inputs on screen first (a hidden search box comes before a console)
+        for (auto& win : gWindows)
+            if (pass == 1 || win->shownVisible)
+                for (auto& item : win->items)
+                    if (!item->retired && item->kind == Kind::TextInput && (pass == 1 || item->visible) && item->text.find(hint) != std::string::npos) {
+                        item->pendingValue = text;
+                        return item->valuePending = true;
+                    }
     return false;
 }
 

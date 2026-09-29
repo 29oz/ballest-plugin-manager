@@ -346,6 +346,51 @@ void RotateAboutCenter() {
     PlaceAboutCenter(turn);
 }
 
+// The piece budget (the header's "budget" bar) is the handler's AllocatedBudget, which the editor adds each piece's
+// BudgetCost to as it is placed and takes it off as it is deleted. Opening a saved map leaves it at 0 whatever the map
+// holds (measured on the 2026-09-29 build, with every plugin off: 19 pieces of cost 1 each, AllocatedBudget 0, the bar
+// empty; the same empty bar shows in a screenshot from before that update), so the bar reads empty and the budget's
+// limit is not enforced. The handler's own InitializeBudget counts the map's pieces again (measured: 19, and the bar
+// filled). So the count is compared with the pieces about once a second, and recounted by the game when it differs.
+// `offset` is how far the game's own count is from the sum here, if it ever is, so the two are not fought over.
+struct BudgetCheck {
+    ULONGLONG next = 0;
+    int offset = 0;
+    eng::Weak handler;
+};
+BudgetCheck gBudget;
+
+void KeepBudget() {
+    Obj handler = Handler();
+    if (GetTickCount64() < gBudget.next || input::Down(kLeftMouse)) return;
+    gBudget.next = GetTickCount64() + 1000;
+    if (eng::Get(gBudget.handler) != handler) {
+        gBudget.handler = eng::MakeWeak(handler);
+        gBudget.offset = 0;
+    }
+    int32_t allocated = 0;
+    if (!eng::ReadBytes(handler, "AllocatedBudget", &allocated, sizeof allocated)) return;
+    int sum = 0;
+    for (Obj a : AllActors()) {
+        int32_t cost = 0;
+        if (a && eng::FindProp(eng::ClassOf(a), "BudgetCost") && eng::ReadBytes(a, "BudgetCost", &cost, sizeof cost)) sum += cost;
+    }
+    if (allocated == sum + gBudget.offset) return;
+    Obj controller = game::PlayerController();
+    if (!controller) return;
+    eng::Params p(eng::FunctionOn(handler, "InitializeBudget"));
+    p.Set("WorldContextObject", controller);
+    if (!eng::Invoke(handler, p)) return;
+    const int counted = p.ReturnAs<int32_t>(-1);
+    int32_t now = 0;
+    eng::ReadBytes(handler, "AllocatedBudget", &now, sizeof now);
+    static int logged = 0;
+    if (++logged <= 20)
+        hostlog::Info("editor: the piece budget read " + std::to_string(allocated) + " with " + std::to_string(sum) +
+                      " on the map; the editor counted again: " + std::to_string(counted) + " (now " + std::to_string(now) + ")");
+    gBudget.offset = now - sum;
+}
+
 }  // namespace
 
 namespace {
@@ -375,6 +420,7 @@ void Frame() {
         gDetails = eng::MakeWeak(found);
     }
     FindPlacements();
+    KeepBudget();
     CycleTransformBoxes();
     RotateAboutCenter();
     WatchClicks();
@@ -583,6 +629,30 @@ std::string JustWrittenMap() {
     return newest;
 }
 
+// The piece under the cursor, from the handler's own MouseTrace (an FHitResult, taken apart with BreakHitResult), without
+// touching the selection: the game's pick (FindAndGrab) selects what it finds, and a selection changed while the
+// button is down ends the drag the press began. A hit on a part of a piece is taken back to the piece (its attach
+// parents and owner). -1 if nothing that is a piece is there.
+int PieceUnderCursor() {
+    Obj handler = Handler();
+    if (!handler) return -1;
+    const eng::Params trace = eng::Call(handler, "MouseTrace", 1.0e6f, uint8_t{0});
+    size_t size = 0;
+    const uint8_t* hit = trace.Return(&size);
+    if (!hit) return -1;
+    Obj statics = eng::FindCdo("GameplayStatics");
+    eng::Params brk(eng::FunctionOn(statics, "BreakHitResult"));
+    if (!brk.Set("Hit", hit, size) || !eng::Invoke(statics, brk)) return -1;
+    Obj actor = brk.GetObj("HitActor");
+    const auto pieces = AllActors();
+    for (int depth = 0; actor && depth < 8; ++depth) {
+        if (std::find(pieces.begin(), pieces.end(), actor) != pieces.end()) return IdOf(actor);
+        Obj parent = eng::Call(actor, "GetAttachParentActor").ReturnObj();
+        actor = parent ? parent : eng::Call(actor, "GetOwner").ReturnObj();
+    }
+    return -1;
+}
+
 const char* ClickName(int modifiers) {
     return (modifiers & kClickAlt) ? "alt" : (modifiers & kClickShift) ? "shift" : (modifiers & kClickCtrl) ? "ctrl" : "plain";
 }
@@ -609,29 +679,32 @@ void ClickHooked(Obj context, uint8_t* frame, void* result) {
                   (input::Down(kControlKey) ? kClickCtrl : 0) | (input::Down(kAltKey) ? kClickAlt : 0);
     const bool gizmoBefore = eng::Call(Handler(), "IsHoveringGizmo").ReturnBool();
     const auto before = Selection();
+    std::set<int> existed;
+    for (Obj a : AllActors()) existed.insert(IdOf(a));
     gClickOriginal(context, frame, result);
     const auto after = Selection();
     const bool gizmoAfter = eng::Call(Handler(), "IsHoveringGizmo").ReturnBool();
     if (gizmoBefore || gizmoAfter) c.modifiers |= kClickOnGizmo;
+    // Alt on the gizmo is the game's duplicate-drag (HandleAltPrimaryPress): the copies it made are selected and being
+    // dragged. That is a drag, not a pick of one of them.
+    bool duplicated = false;
+    for (int id : after) duplicated |= !existed.count(id);
+    if (duplicated) c.modifiers |= kClickOnGizmo;
     // The piece clicked: the one the game's handling added to the selection. A plain click leaves the clicked piece as
-    // the whole selection. Otherwise (Alt, or Shift/Ctrl on a piece that was selected already) the game's own pick
-    // (FindAndGrab, which traces under the cursor) is asked for it and the selection the game left is put back. That
-    // is only done off the gizmo: any change of selection while the button is down re-binds the gizmo and ends the
-    // drag the press began (reported after the 2026-09-25 update: pieces could not be moved).
-    for (int id : after)
-        if (std::find(before.begin(), before.end(), id) == before.end()) c.piece = id;
+    // the whole selection. Otherwise (Alt, or Shift/Ctrl on a piece that was selected already) the piece under the
+    // cursor is found with the handler's trace. Nothing here changes the selection: any change while the button is
+    // down re-binds the gizmo and ends the drag the press began (reported after the 2026-09-25 update: pieces could not
+    // be moved; and on 2026-09-29: pieces stuck and the gizmo gone after grouping).
+    if (!duplicated)
+        for (int id : after)
+            if (std::find(before.begin(), before.end(), id) == before.end()) c.piece = id;
     const bool plain = !(c.modifiers & (kClickShift | kClickCtrl | kClickAlt));
     // A plain press on empty space deselects everything; one that left a selection of several as it was landed on
     // the gizmo (measured after the 2026-09-25 update, when IsHoveringGizmo answered no even during a drag).
     if (c.piece < 0 && plain && after.size() > 1 && std::is_permutation(after.begin(), after.end(), before.begin(), before.end()))
         c.modifiers |= kClickOnGizmo;
     if (c.piece < 0 && plain && after.size() == 1) c.piece = after[0];
-    else if (c.piece < 0 && !plain && !(c.modifiers & kClickOnGizmo)) {
-        eng::Call(Handler(), "FindAndGrab", uint8_t{0});
-        const auto picked = Selection();
-        if (picked.size() == 1) c.piece = picked[0];
-        Select(after);
-    }
+    else if (c.piece < 0 && !plain && !(c.modifiers & kClickOnGizmo)) c.piece = PieceUnderCursor();
     c.wasSelected = c.piece >= 0 && std::find(before.begin(), before.end(), c.piece) != before.end();
     hostlog::Info(std::string("editor: ") + ClickName(c.modifiers) + " click on " + (c.piece >= 0 ? eng::ObjName(Resolve(c.piece)) : std::string("nothing")) +
                   (c.wasSelected ? " (selected)" : "") + ((c.modifiers & kClickOnGizmo) ? " on the gizmo" : "") + "; the game left " +

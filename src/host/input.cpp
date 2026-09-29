@@ -10,6 +10,7 @@ namespace {
 
 bool gDown[kKeyCount] = {}, gWasDown[kKeyCount] = {};
 int gSimulated = 0;
+bool gHeld[kKeyCount] = {};             // test hook: keys reported as held whatever the keyboard says
 
 bool GameHasFocus() {
     DWORD pid = 0;
@@ -83,7 +84,7 @@ void Frame() {
     }
     for (int key = 1; key < kKeyCount; ++key) {
         gWasDown[key] = gDown[key];
-        gDown[key] = now[key];
+        gDown[key] = now[key] || gHeld[key];
     }
     if (gSimulated) {
         gWasDown[gSimulated] = false;
@@ -95,6 +96,9 @@ void Frame() {
 bool Down(int key) { return Valid(key) && gDown[key]; }
 bool Pressed(int key) { return Valid(key) && gDown[key] && !gWasDown[key]; }
 void Simulate(int key) { gSimulated = Valid(key) ? key : 0; }
+void SimulateHeld(int key, bool held) {
+    if (Valid(key)) gHeld[key] = held;
+}
 
 int AnyPressed() {
     // Shift, Ctrl and Alt are reported as their left/right keys too (0xA0..0xA5); only the generic ones count here.

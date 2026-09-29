@@ -9,6 +9,9 @@
 //   * the details panel is a W_Details_C whose WS_Details switcher shows its second child (a VerticalBox: the
 //     transform header, W_Transform, the paint section) while something is selected. W_Transform holds W_Location,
 //     W_Rotation and W_Scale, each with three ValidatedTextEntry boxes VTE_Axis1..3 around an EditableText.
+//   * the piece budget (the header's bar) is the handler's AllocatedBudget; opening a saved map leaves it at 0, so the
+//     host has the handler count it again (InitializeBudget) whenever it differs from the pieces' BudgetCost.
+//   * nothing here changes the selection while the left button is down: that ends the drag the press began.
 // Pieces are identified by their object-array slot; an id stops resolving when the piece is deleted.
 // Game thread only.
 #pragma once

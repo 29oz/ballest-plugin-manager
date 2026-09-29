@@ -5,12 +5,14 @@
 //
 //   state                                  UI and plugin status
 //   click <label>[#n] | select <first option> <index> | slider <0..1> | press <virtual key> | submit [@<hint>|]<text>
-//   | type [@<hint>|]<text> (put in the box as if typed, no Enter)
+//   | type [@<hint>|]<text> (put in the box as if typed, no Enter); select, submit and type prefer windows on screen
+//   hold <virtual key> 1|0                 a key or mouse button held for plugins until released (for clicks posted to
+//                                          the game's window, which the host's own input does not see)
 //   fakereplay on [length] | fakereplay off | replaytime
 //   install <id> | remove <id>             through the registry, as the plugin browser's buttons do
 //   enable <id> 0|1                        turn a plugin off or on, as its card's button does
 //   editor [rotatecontext on|off]         the track editor's selection with each piece's transform
-//   editor pieces | editor select <id>,<id> | editor call <handler function>
+//   editor pieces | editor select <id>,<id> | editor call <handler function> | editor screen <id> (window pixels)
 //   setting <plugin id> <variable> <value> change a plugin's [Setting] as the settings view does
 //   openmap <file name fragment>          on the Create page: open that saved map in the editor
 //   open <map>                             load a map directly (skips the menu's level setup)

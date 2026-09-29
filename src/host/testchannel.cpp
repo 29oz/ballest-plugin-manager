@@ -317,6 +317,10 @@ void Run(const std::string& cmd) {
              input::Simulate(std::atoi(Arg(a, 1).c_str()));
              Report(c);
          }},
+        {"hold", [](const Args& a, const std::string& c) {       // hold <vk> 1|0: a key or button held, for posted clicks
+             input::SimulateHeld(std::atoi(Arg(a, 1).c_str()), Arg(a, 2) != "0");
+             Report(c);
+         }},
         {"fakereplay", [](const Args& a, const std::string&) { replay::Simulate(Arg(a, 1) == "on", a.size() > 2 ? std::atof(Arg(a, 2).c_str()) : 30); }},
         {"replaytime", [](const Args&, const std::string&) {
              Report("replay time " + std::to_string(replay::Time()) + " of " + std::to_string(replay::Length()));
@@ -339,6 +343,14 @@ void Run(const std::string& cmd) {
         {"editor", [](const Args& a, const std::string&) {
              if (Arg(a, 1) == "rotatecontext") editor::ForceRotateContext(Arg(a, 2) == "on");
              if (Arg(a, 1) == "pieces") return Report(editor::PiecesStatus());
+             if (Arg(a, 1) == "screen") {                   // editor screen <id>: where the piece's middle is, in window pixels
+                 double x = 0, y = 0;
+                 const bool on = editor::ScreenPosition(std::atoi(Arg(a, 2).c_str()), &x, &y);
+                 const float scale = eng::Call(eng::FindCdo("WidgetLayoutLibrary"), "GetViewportScale", game::PlayerController()).ReturnAs<float>(0.0f);
+                 char buf[128];
+                 std::snprintf(buf, sizeof buf, "editor screen %s: %s %.0f,%.0f", Arg(a, 2).c_str(), on ? "on screen" : "off screen", x * scale, y * scale);
+                 return Report(buf);
+             }
              if (Arg(a, 1) == "call") Report(Arg(a, 2) + (editor::CallHandler(Arg(a, 2)) ? " -> ok" : " -> failed"));
              if (Arg(a, 1) == "clicks") {
                  editor::SetWatchingClicks(Arg(a, 2) != "off");

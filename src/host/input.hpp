@@ -16,5 +16,6 @@ bool Down(int key);
 bool Pressed(int key);          // went down this frame
 int AnyPressed();               // a key that went down this frame, or 0
 void Simulate(int key);         // test hook: reported as pressed on the next frame
+void SimulateHeld(int key, bool held);     // test hook: reported as held until released (clicks posted to the window)
 
 }  // namespace input

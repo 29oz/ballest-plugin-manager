@@ -122,7 +122,8 @@ def startup(c):
     check("hello world logs through the API", c.wait(r"\[hello-world\] hello from a plugin", 10))
     check("replay manager loaded", c.wait(r"\[replay-manager\] replay manager ready", 10))
     check("a plugin that throws is stopped, with the reason", c.wait(r"\[zz-test-throws\] exception: Null pointer access", 30))
-    check("a plugin that hangs is stopped at its time budget", c.wait(r"\[zz-test-hangs\] stopped: exceeded its 20 ms budget", 30))
+    check("a plugin that hangs is cut short at its time budget", c.wait(r"\[zz-test-hangs\] Update exceeded its 20 ms budget and was cut short", 30))
+    check("and stopped when it keeps hanging", c.wait(r"\[zz-test-hangs\] stopped: exceeded its 20 ms budget", 30))
     check("no compile or API errors", not any(re.search(r"\[error\] \[(compiler|host)\]", l) for l in lines()))
     time.sleep(12)      # the game's loading screen covers the menu for a few seconds; screenshots should show it
 
