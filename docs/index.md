@@ -11,7 +11,8 @@ like C++ or C#. You don't need a compiler, Visual Studio or any engine tools. A 
 
 - **[Your first plugin](getting-started.md)**: a plugin that shows a window, in about ten minutes.
 - **[How plugins run](concepts.md)**: callbacks, the time budget, and what happens when something goes wrong.
-- **[Guides](guides/ui.md)**: windows and widgets, settings, saving data, debugging, publishing.
+- **[Guides](guides/ui.md)**: windows and widgets, settings, saving data, debugging, publishing, drawing in the
+  world.
 - **[API reference](reference/api/ui.md)**: every function, each with an example.
 
 </div>
@@ -58,5 +59,7 @@ A folder in the game's `plugins` folder with two files:
   to others, and one depending on it to add custom balls, a hat and a goal explosion, with models.
 - [Monkey Balls](https://github.com/AnythingGoes-ballest/ballest-monkey-balls): characters that run inside clear
   balls, with limbs that swing from their joints and keep time with the ball.
+- [Fit Window](https://github.com/AnythingGoes-ballest/ballest-fit-window): a few lines that maximize the game's
+  window at startup when it doesn't fit the screen.
 - [Plugin Manager](https://github.com/AnythingGoes-ballest/ballest-plugin-manager/tree/main/plugins/plugin-manager):
   the plugin browser, settings pages and console, built with cards and a tab header. This is the largest example.

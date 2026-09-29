@@ -58,5 +58,17 @@ A setting at its default isn't saved. If you change a default in a later version
 setting gets the new one. Settings are stored with your plugin's [Storage](../reference/api/storage.md) under
 `setting.<variable name>`, so don't use keys starting with `setting.` for anything else.
 
-A plugin can also assign its own setting variables. The change is used straight away but isn't saved: settings are
-saved when the player changes them.
+A plugin can also assign its own setting variables. The change is used straight away but isn't saved. To change a
+setting the way the player does, saved and with `OnSettingsChanged()` called, use `Settings::Set` on it. A plugin may
+set its own settings this way (only the plugin manager can set other plugins'), which is how a plugin offers a settings
+panel of its own:
+
+```cpp
+// This plugin's settings, shown in a window of its own
+for (uint i = 0; i < Settings::Count(); i++)
+    if (Settings::Plugin(i) == "my-plugin" && Settings::Kind(i) == "bool")
+        boxes.insertLast(window.AddCheckBox(Settings::Name(i), 15));
+
+// later: a box changed
+Settings::Set(index, box.checked ? "true" : "false");
+```

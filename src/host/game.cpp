@@ -140,6 +140,55 @@ bool MousePosition(double* x, double* y) {
     return true;
 }
 
+namespace {
+HWND GameWindow() {
+    struct Search {
+        DWORD pid;
+        HWND found;
+    } search{GetCurrentProcessId(), nullptr};
+    EnumWindows(
+        [](HWND w, LPARAM p) -> BOOL {
+            auto* s = reinterpret_cast<Search*>(p);
+            DWORD pid = 0;
+            GetWindowThreadProcessId(w, &pid);
+            char cls[64] = {};
+            GetClassNameA(w, cls, sizeof cls);
+            if (pid != s->pid || !IsWindowVisible(w) || std::strcmp(cls, "UnrealWindow") != 0) return TRUE;
+            s->found = w;
+            return FALSE;
+        },
+        reinterpret_cast<LPARAM>(&search));
+    return search.found;
+}
+}  // namespace
+
+bool WindowMaximized() {
+    HWND w = GameWindow();
+    return w && IsZoomed(w);
+}
+
+bool WindowFitsScreen() {
+    HWND w = GameWindow();
+    if (!w) return true;
+    if ((GetWindowLongW(w, GWL_STYLE) & WS_CAPTION) != WS_CAPTION) return true;     // fullscreen or borderless
+    RECT r;
+    MONITORINFO m{};
+    m.cbSize = sizeof m;
+    if (!GetWindowRect(w, &r) || !GetMonitorInfoW(MonitorFromWindow(w, MONITOR_DEFAULTTONEAREST), &m)) return true;
+    // The window's rectangle includes Windows 10/11's invisible resize borders (about 7 px each side and below), which
+    // may hang past the work area without anything showing: a few pixels are allowed.
+    constexpr LONG kSlack = 12;
+    return r.left >= m.rcWork.left - kSlack && r.right <= m.rcWork.right + kSlack && r.top >= m.rcWork.top &&
+           r.bottom <= m.rcWork.bottom + kSlack;
+}
+
+bool MaximizeWindow() {
+    HWND w = GameWindow();
+    if (!w || (GetWindowLongW(w, GWL_STYLE) & WS_CAPTION) != WS_CAPTION) return false;
+    ShowWindow(w, SW_MAXIMIZE);
+    return IsZoomed(w) != 0;
+}
+
 bool ScreenSize(double* width, double* height) {
     Obj controller = PlayerController();
     if (!controller) return false;

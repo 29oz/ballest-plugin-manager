@@ -49,6 +49,38 @@ window.AddText("restarts 12", 18);
 
 A hidden widget (`widget.visible = false`) takes no space, so its row closes up.
 
+## Placed items
+
+Rows suit forms. For anything drawn to measure (bars, charts, a timeline), place rectangles and text at positions
+of their own, in window units from the window's top left inside its padding. They stay where they're put and can be
+moved, resized and recoloured every frame without rebuilding the window:
+
+```cpp
+UI::Rect@ bar = window.AddRect(20, 40, 0, 12);         // x, y, width, height
+bar.SetColor(0.3f, 0.8f, 0.4f, 1);
+UI::Text@ label = window.AddTextAt("", 13, 20, 58);    // text, size, x, y
+
+// every frame
+bar.SetRect(20, 40, 300 * progress, 12);
+label.text = int(progress * 100) + "%";
+```
+
+`AddSlider(0)` makes a slider that fills what's left of its row. `window.SetCornerRadius(10)` rounds a window's
+corners.
+
+## Keeping clear of the footer
+
+`UI::ScreenSize` gives the screen's size in window units. The game's footer bar (volume, the plugin buttons, Discord)
+sits along the bottom; `UI::FooterHeight` says how tall it is, so a window at the bottom can sit just above it:
+
+```cpp
+float w, h;
+if (UI::ScreenSize(w, h))
+    dock.SetRect(0, h - UI::FooterHeight() - 200, w, 200);
+```
+
+`Hud::HideGame(true)` hides the game's race UI for a clear view of the track, and keeps the footer.
+
 ## Reading what the player did
 
 Buttons, dropdowns, text boxes and tick boxes report events with functions that return `true` **once**: reading

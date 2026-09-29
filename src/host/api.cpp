@@ -493,6 +493,9 @@ void RegisterCore() {
     Global("string Version()", asFUNCTION(HostVersion));
     Global("double Time()", asFUNCTION(HostTime));
     Global("int MapNumber()", asFUNCTION(game::Generation));
+    Global("bool WindowMaximized()", asFUNCTION(game::WindowMaximized));
+    Global("bool WindowFitsScreen()", asFUNCTION(game::WindowFitsScreen));
+    Global("bool MaximizeWindow()", asFUNCTION(game::MaximizeWindow));
     Global("void OpenUrl(const string &in)", asFUNCTION(OpenUrl));
 
     e->SetDefaultNamespace("Plugins");

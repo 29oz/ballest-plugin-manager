@@ -54,14 +54,21 @@ A plugin can only do what the API offers. It can't read or write files, open net
 game directly. The API covers:
 
 - **[UI](reference/api/ui.md)**: footer buttons, panels, and windows built from the game's own widgets
-- **[Input](reference/api/input.md)**: keys and mouse buttons
+- **[Input](reference/api/input.md)**: keys, mouse buttons, the mouse wheel and controllers
 - **[Race](reference/api/race.md)**, **[Replay](reference/api/replay.md)** and **[Editor](reference/api/editor.md)**:
   what's happening in the game, and some control over it
+- **[Hud](reference/api/hud.md)**: the race HUD's parts moved, sized and hidden, or the whole race UI hidden
+- **[Cosmetics](reference/api/cosmetics.md)**: custom balls, hats and goal explosions
+- **[Draw](reference/api/draw.md)** and **[Camera](reference/api/camera.md)**: shapes in the world, and a camera of
+  your own (see [Drawing in the world](guides/world.md))
+- **[Leaderboard](reference/api/leaderboard.md)**, **[Ghosts](reference/api/ghosts.md)** and
+  **[Tracks](reference/api/tracks.md)**: a track's leaderboard and its runs, and opening tracks
 - **[Storage](reference/api/storage.md)**: saved text values, private to your plugin
-- **[Log](reference/api/log.md)** and **[Host](reference/api/host.md)**: the log, a clock, opening GitHub pages
+- **[Log](reference/api/log.md)** and **[Host](reference/api/host.md)**: the log, a clock, opening GitHub pages, the
+  game's window
 
 Installing and removing plugins, updating the host and changing other plugins' settings are for the plugin manager
-only.
+only. A plugin can change its own settings.
 
 ## Plugins that use other plugins
 

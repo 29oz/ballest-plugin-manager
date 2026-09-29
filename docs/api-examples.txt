@@ -63,6 +63,26 @@ older hosts then refuse to install or run the plugin.
 // Shown in an about panel
 aboutText.text = "running on plugin host " + Host::Version();
 
+== Host::WindowMaximized
+Whether the game's window is maximized. Requires host 0.15.0.
+--
+if (!Host::WindowMaximized())
+    Log::Info("windowed, not maximized");
+
+== Host::WindowFitsScreen
+Whether the game's window fits the usable part of its screen (the taskbar left out). A fullscreen or borderless window
+always does. A bordered window reopened at the size it had maximized doesn't: its title bar and borders push it past
+the screen. Requires host 0.15.0.
+--
+if (!Host::WindowFitsScreen())
+    Host::MaximizeWindow();
+
+== Host::MaximizeWindow
+Maximizes the game's window (a bordered one; fullscreen and borderless are left alone), as double-clicking its title
+bar does. True if it's maximized now. Requires host 0.15.0.
+--
+Host::MaximizeWindow();
+
 == Host::MapNumber
 A number that goes up each time a map loads (the menu, a track, the editor). Compare two readings to tell that the
 map changed, even to another copy of the same track. Requires host 0.14.0.

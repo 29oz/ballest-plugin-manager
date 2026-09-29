@@ -74,7 +74,7 @@ plugin's GitHub repo and lists the SHA-256 of every file the game downloads:
 | `src/host/layout.hpp` | Every measured offset and address in the game binary, in one place |
 | `src/host/engine.*` | Reflection: objects, names, properties, calling functions (`eng::Call`), weak references, text |
 | `src/host/main.cpp` | Loading, the build check, the per-frame hook, and the frame order |
-| `src/host/game.*` | World context, player controller, map changes, time, cursor, typing input mode, opening maps |
+| `src/host/game.*` | World context, player controller, map changes, time, cursor, typing input mode, opening maps, the game's window |
 | `src/host/input.*` | Keyboard, mouse and controllers (XInput), only while the game window has focus |
 | `src/host/race.*` | Whether a race is running, restarts (the ball's own counter), run id, finish, the track (name, author, author time, key), the player's input, pause, saving and loading the ball, practice runs |
 | `src/host/editor.*` | The track editor: pieces, selection, placements (from the handler's SpawnActor), clicks (from the pawn's click events), rotate modes (centre, mirrored), duplicate, Tab between transform boxes, the toolbar dropdowns and key list rows plugins add |
@@ -91,6 +91,11 @@ plugin's GitHub repo and lists the SHA-256 of every file the game downloads:
 | `src/host/api.*` | The script API (all bindings in one file) |
 | `src/host/cosmetics.*` | Custom balls, hats and goal explosions: the Customize page's custom sections, what the player picks (the page's handler, wrapped), and wearing them on the player's own balls |
 | `src/host/leaderboard.*` | The leaderboard inside a map: its player count (Steam's entry count) and a note after its title |
+| `src/host/draw.*` | Shapes plugins draw in the world (tubes, balls, glow and glass) and the camera a plugin takes |
+| `src/host/steam.*` | Steam's flat API: leaderboards, their entries and attached files (UGC), workshop search |
+| `src/host/ghostdata.*` | Replay JSON parsed into samples, looks and splits; positions and checkpoint orders |
+| `src/host/ghosts.*` | Loading a leaderboard's runs (paged, downloaded in parallel, parsed on worker threads), player balls, crowds |
+| `src/host/tracks.*` | The game's tracks and the workshop's, their titles and pictures, and opening them |
 | `src/host/models.*` | Models: shapes described in text, built as Geometry Script dynamic meshes and attached to a ball or hat slot |
 | `src/host/testchannel.*` | Test and measurement commands, from the console and from the tools below |
 | `src/proxy/` | The `version.dll` export stubs (generated from the system DLL's export table) |

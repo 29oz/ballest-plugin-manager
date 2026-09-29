@@ -28,6 +28,11 @@ double MouseWheel();
 // The game's screen in widget units (those of window offsets and MousePosition): the viewport's size in pixels
 // (WidgetLayoutLibrary.GetViewportSize) over its DPI scale (GetViewportScale).
 bool ScreenSize(double* width, double* height);
+// The game's own window (its top-level window, class UnrealWindow): whether it's maximized; whether it fits the usable
+// part of its screen (the taskbar left out), fullscreen and borderless always do; maximizing it.
+bool WindowMaximized();
+bool WindowFitsScreen();
+bool MaximizeWindow();
 
 // The text input being typed in, or null. While there is one, input is UI-only with it focused: the game's
 // viewport ignores keys, so the player controller (whose "any key" event moves menu focus) and the pawn never
