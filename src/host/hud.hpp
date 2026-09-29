@@ -26,6 +26,7 @@ struct Element {
     std::string key, name, className, label;    // label: plugin windows' plugin name, else ""
     bool shown = false;                         // visible, with everything it sits in
     bool parentShown = false;                   // what it sits in is visible (it may be hidden for now, e.g. a split)
+    float opacity = 1;                          // its render opacity (a layout's "off" is 0)
 };
 std::vector<Element> Elements();                // the race HUD on screen now; empty off track
 

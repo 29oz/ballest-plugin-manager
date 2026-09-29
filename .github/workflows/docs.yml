@@ -1,6 +1,6 @@
 # Builds the docs site (mkdocs.yml) and publishes it to GitHub Pages. The API reference is generated from
-# src/host/api.cpp first; the build fails if a registered function has no entry in docs/api-examples.txt, or if a
-# page has a broken link (--strict). Pull requests only build, as a check.
+# src/host/api.cpp first; the build fails if a registered function has no entry in docs/api-examples.txt, if it has no
+# test in tools/api-tests, or if a page has a broken link (--strict). Pull requests only build, as a check.
 name: docs
 
 on:
@@ -12,6 +12,8 @@ on:
       - "requirements-docs.txt"
       - "src/host/api.cpp"
       - "tools/gen_api_docs.py"
+      - "tools/api_tests.py"
+      - "tools/api-tests/**"
       - ".github/workflows/docs.yml"
   pull_request:
     paths:
@@ -19,6 +21,7 @@ on:
       - "mkdocs.yml"
       - "src/host/api.cpp"
       - "tools/gen_api_docs.py"
+      - "tools/api-tests/**"
   workflow_dispatch:
 
 permissions:
@@ -37,6 +40,7 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install -r requirements-docs.txt
+      - run: python tools/api_tests.py --coverage      # every documented API has an in-game test
       - run: python tools/gen_api_docs.py
       - run: mkdocs build --strict
       - if: github.event_name != 'pull_request'

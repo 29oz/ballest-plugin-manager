@@ -1,0 +1,4 @@
+# A text model, for the model tests: a spinning glowing ring around the ball.
+material light glow #40c0ff bright=10
+group ring spin=z speed=90 travel
+ring light r=60 thick=3

@@ -265,6 +265,8 @@ void EarlyWindowFit(const std::wstring& gameDir) {
     }).detach();
 }
 
+void* WindowHandle() { return GameWindow(); }
+
 bool ScreenSize(double* width, double* height) {
     Obj controller = PlayerController();
     if (!controller) return false;

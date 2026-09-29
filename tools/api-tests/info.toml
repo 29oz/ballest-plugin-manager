@@ -1,0 +1,10 @@
+[meta]
+name = "API tests"
+version = "0.0.1"
+author = "AnythingGoes"
+description = "Tests every function of the script API in the game. Installed by tools/api_tests.py for a run only."
+min_host = "0.16.0"
+
+[script]
+files = ["main.as"]
+assets = ["test.png", "cube.obj", "shapes.txt"]

@@ -356,9 +356,10 @@ std::vector<Element> Elements() {
         Element e{f.key, f.name, f.className, "", Shown(widget), false};
         Obj parent = eng::Call(widget, "GetParent").ReturnObj();
         e.parentShown = e.shown || !parent || Shown(parent);
+        e.opacity = eng::Call(widget, "GetRenderOpacity").ReturnAs<float>(1);
         out.push_back(e);
     }
-    for (const auto& hw : ui::HudWindows()) out.push_back({hw.key, hw.key, "Window", hw.label, true, true});
+    for (const auto& hw : ui::HudWindows()) out.push_back({hw.key, hw.key, "Window", hw.label, true, true, hw.window ? hw.window->hudOpacity : 1});
     return out;
 }
 

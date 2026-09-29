@@ -2,6 +2,7 @@
 
 #include <windows.h>
 
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <cstring>
@@ -26,6 +27,7 @@
 
 namespace testchannel {
 namespace {
+std::vector<std::pair<int, ULONGLONG>> gPostedUps;     // keys posted down, and when to let them go
 
 std::vector<std::string> Words(const std::string& s) {
     std::vector<std::string> out;
@@ -317,6 +319,15 @@ void Run(const std::string& cmd) {
              input::Simulate(std::atoi(Arg(a, 1).c_str()));
              Report(c);
          }},
+        {"post", [](const Args& a, const std::string& c) {       // post <vk> [ms]: a key pressed in the game's own window
+             const int vk = std::atoi(Arg(a, 1).c_str());
+             HWND w = static_cast<HWND>(game::WindowHandle());
+             if (!w || vk <= 0 || vk > 255) return Report(c + " -> no game window or key");
+             const LPARAM scan = static_cast<LPARAM>(MapVirtualKeyW(static_cast<UINT>(vk), 0)) << 16;
+             PostMessageW(w, WM_KEYDOWN, static_cast<WPARAM>(vk), 1 | scan);
+             gPostedUps.push_back({vk, GetTickCount64() + static_cast<ULONGLONG>(std::max(30, std::atoi(Arg(a, 2).c_str())))});
+             Report(c + " -> ok");
+         }},
         {"hold", [](const Args& a, const std::string& c) {       // hold <vk> 1|0: a key or button held, for posted clicks
              input::SimulateHeld(std::atoi(Arg(a, 1).c_str()), Arg(a, 2) != "0");
              Report(c);
@@ -511,7 +522,7 @@ void Run(const std::string& cmd) {
         {"hud", [](const Args&, const std::string&) {              // the HUD's elements
              for (const auto& el : hud::Elements())
                  Report("hud: " + el.key + " (" + el.className + ")" + (el.shown ? " shown" : el.parentShown ? " hidden for now" : " hidden") +
-                        (el.label.empty() ? "" : " \"" + el.label + "\""));
+                        (el.label.empty() ? "" : " \"" + el.label + "\"") + " opacity " + std::to_string(el.opacity).substr(0, 4));
          }},
         {"widgetpath", [](const Args& a, const std::string&) {    // widgetpath <Class> <filter>: each instance's parents up its tree
              for (eng::Obj o : Instances(Arg(a, 1), Arg(a, 2))) {
@@ -628,7 +639,10 @@ void Run(const std::string& cmd) {
                  if (skin && eng::IsLive(skin)) eng::ReadBool(skin, "bHidden", &hidden);
                  struct V { double x, y, z; };
                  const V v = eng::Call(o, "GetVelocity").ReturnAs<V>();
-                 Report("ball " + eng::ObjName(o) + " speed " + std::to_string(static_cast<int>(std::sqrt(v.x * v.x + v.y * v.y + v.z * v.z))) +
+                 bool actorHidden = false;
+                 eng::ReadBool(o, "bHidden", &actorHidden);
+                 Report("ball " + eng::ObjName(o) + (actorHidden ? " actor hidden" : " actor shown") + " speed " +
+                        std::to_string(static_cast<int>(std::sqrt(v.x * v.x + v.y * v.y + v.z * v.z))) +
                         " skin " + (skin && eng::IsLive(skin) ? eng::ObjName(skin) + (hidden ? " hidden" : " SHOWN") : std::string("none")) +
                         " sphere " + (eng::Call(sphere, "IsVisible").ReturnBool() ? "visible" : "hidden") + " mesh " +
                         eng::ObjName(eng::ReadObj(sphere, "StaticMesh")) + " material " +
@@ -706,6 +720,18 @@ void PollFile() {
 }  // namespace
 
 void Frame() {
+    // Keys posted with "post": let go when their time is up (the game reads a press and a release, not a state).
+    for (auto it = gPostedUps.begin(); it != gPostedUps.end();) {
+        if (GetTickCount64() < it->second) {
+            ++it;
+            continue;
+        }
+        if (HWND w = static_cast<HWND>(game::WindowHandle())) {
+            const LPARAM scan = static_cast<LPARAM>(MapVirtualKeyW(static_cast<UINT>(it->first), 0)) << 16;
+            PostMessageW(w, WM_KEYUP, static_cast<WPARAM>(it->first), 1 | scan | (1LL << 30) | (1LL << 31));
+        }
+        it = gPostedUps.erase(it);
+    }
     std::vector<std::string> queued;
     queued.swap(gQueue);            // a command that queues another runs it next frame
     for (const auto& cmd : queued) Run(cmd);

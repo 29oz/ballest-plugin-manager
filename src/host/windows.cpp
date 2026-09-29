@@ -928,9 +928,12 @@ bool SimulateClick(const std::string& label) {
     }
     for (auto& win : gWindows)
         for (auto& item : win->items)
-            if (!item->retired && (item->kind == Kind::Button || item->kind == Kind::IconButton) && (item->text == wanted || wanted == "icon") &&
-                --nth == 0)
-                return item->clickPending = true;
+            if (!item->retired && (item->kind == Kind::Button || item->kind == Kind::IconButton || item->kind == Kind::CheckBox) &&
+                (item->text == wanted || wanted == "icon") && --nth == 0) {
+                if (item->kind != Kind::CheckBox) return item->clickPending = true;
+                item->checked = !item->checked;             // shown on the next refresh, as a click on it would
+                return item->changedPending = true;
+            }
     return false;
 }
 
@@ -992,7 +995,7 @@ std::string Status() {
     for (auto& win : gWindows) {
         s += std::string(s.empty() ? "" : " ") + "window=" + (eng::Get(win->host) ? (win->shownVisible ? "shown" : "hidden") : "absent");
         for (auto& item : win->items)
-            if (!item->retired && item->kind == Kind::Text) {
+            if (!item->retired && item->kind == Kind::Text && item->visible && item->shownVisible) {     // on screen only
                 std::string text = item->text;
                 for (char& c : text)
                     if (c == '\n') c = '/';        // one log line per status

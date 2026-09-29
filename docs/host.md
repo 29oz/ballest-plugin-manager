@@ -128,6 +128,34 @@ install from a local copy of the registry), the Replay Manager on a simulated re
 scrubbing, restart at 5x, camera dropdown), a map load, and crashes. It expects the Replay Manager to be installed.
 Real replays cannot be started by script, so camera modes on a real replay are checked by hand.
 
+### API tests
+
+```bash
+python tools/api_tests.py             # every script API function, in the game: which work and which are broken
+python tools/api_tests.py --coverage  # (no game) every documented API has a test; also run by the docs CI
+```
+
+After a game update, this says exactly which API functions still work. `tools/api-tests` is a plugin with tests for
+all of them. The runner installs it for the run only, with every other plugin turned off, then launches the game.
+The plugin drives the game itself (with `Console::Run` and the host's test commands) through phases: the main menu,
+the Customize page, a simulated replay, an official track before and during a race, a workshop track, the track
+editor with a saved map (opened, never saved) and a test run in it. A full run takes about four minutes.
+
+Each test checks what a plugin can see: return values, the log (`Log::Line`), and the host's test commands for the
+game's state (what's on screen, whether the ball is hidden, a HUD part's opacity). The report
+(`build/api-test-report.md` and `.json`) lists every documented function as passing, failing, unverified, skipped
+or untested. Check messages name the function they're about, so only that one fails. The plugin settings, storage,
+the plugins turned off and `window_at_start.txt` are put back afterwards.
+
+Some functions can't be checked by script: `Plugins::OpenFolder` would open a File Explorer window, and
+`Editor::NextClick` needs a real click (the editor's pick traces from the real cursor). Those are skipped and checked
+by hand.
+
+A new API function needs a test: add one to `tools/api-tests/main.as`, naming what it covers. The docs CI fails
+while any documented function has none. Options: `--phases core,ui,...` runs some phases only, `--track <level>`
+picks the track (default Leth Trial 01, which has checkpoints besides the finish), `--editor-map <name part>` picks
+the saved map, `--keep` leaves the game open.
+
 - Log: `%LOCALAPPDATA%\Ballest\Saved\PluginManager\host.log` (host and plugins; screenshots from the suite land here too)
 - `python tools/symbolize.py` names the host's frames in the newest crash report
 - `python tools/dev_session.py commands.txt [--map Map_Track13] [--attach]` runs test-channel commands against a fresh

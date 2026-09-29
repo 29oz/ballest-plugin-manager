@@ -6,6 +6,8 @@
 //   state                                  UI and plugin status
 //   click <label>[#n] | select <first option> <index> | slider <0..1> | press <virtual key> | submit [@<hint>|]<text>
 //   | type [@<hint>|]<text> (put in the box as if typed, no Enter); select, submit and type prefer windows on screen
+//   post <virtual key> [ms]               a key pressed in the game's own window (for the game's input: starting a race,
+//                                          rolling the ball), let go after ms (default 30)
 //   hold <virtual key> 1|0                 a key or mouse button held for plugins until released (for clicks posted to
 //                                          the game's window, which the host's own input does not see)
 //   fakereplay on [length] | fakereplay off | replaytime
