@@ -99,14 +99,14 @@
       "description": "Maximizes the game's bordered window at startup when it doesn't fit the screen (the title bar above the top, the bottom over the taskbar).",
       "author": "AnythingGoes",
       "repo": "AnythingGoes-ballest/ballest-fit-window",
-      "version": "0.1.0",
-      "commit": "0c5ef5dec60c2c3f7a0e9087094f2e859fd3b849",
-      "min_host": "0.15.0",
+      "version": "0.2.0",
+      "commit": "b2f4c3834ba63de6fd95d964c407b96f943a7bd8",
+      "min_host": "0.15.1",
       "icon": "",
       "dependencies": [],
       "files": {
-        "info.toml": "3db66f370ec33a78c7b7343f7e346f7a866876a3f927a9139763bf8ccccade8d",
-        "main.as": "e99fb30b5ba253daa79e56ba0376f258b09f7d20de8d79dc1fc4b4c91c451150"
+        "info.toml": "03e43baaf46a5c1008fa6687138638f4eb263f50a0fdcfe936c080a6dabb489e",
+        "main.as": "8202f10a209c7e4116aa61387b8b435c2e0717805ceaef5eb309a6e0909ecf38"
       }
     },
     {
@@ -209,18 +209,18 @@
     }
   ],
   "host": {
-    "version": "0.15.0",
+    "version": "0.15.1",
     "repo": "AnythingGoes-ballest/ballest-plugin-manager",
-    "commit": "e6b2b96bed3418119830b28f6f75886e6c7fef81",
-    "dll": "https://github.com/AnythingGoes-ballest/ballest-plugin-manager/releases/download/v0.15.0/version.dll",
-    "dll_sha256": "52b7d2fb57937838840669fea65c0d588909b4e8537ad9fd34d77ba60e925715",
+    "commit": "fc56a95606100dda71720a5e08addeca7731571c",
+    "dll": "https://github.com/AnythingGoes-ballest/ballest-plugin-manager/releases/download/v0.15.1/version.dll",
+    "dll_sha256": "c0f478eaa5211499dd56fe147f9294acefdfa148bcd768ea111f2212bde30524",
     "files": {
       "plugins/hello-world/info.toml": "5300e78277bc1e92d4d1626ce17ed15e938f37e692b2271b58c3c9c30b79be40",
       "plugins/hello-world/main.as": "24f510821cb3ea7825bfef6363d92e12fd493b9977038beb9e6c297a692fb23b",
       "plugins/plugin-manager/default-icon.png": "304d27462febbf15c8645b64ae6b01624e4a59e29e0304ffac1f28313a3ba362",
       "plugins/plugin-manager/icon.png": "fb60df477ecffe4942dc7500d2f4f6cb8b65d017bde68b49b81541c29f8e144e",
-      "plugins/plugin-manager/info.toml": "3e8bdab58c7cad93cd76f2bb55e05891be12ffb11e780370bbfa283a3030d1f3",
-      "plugins/plugin-manager/main.as": "1a512f49240c7ce25f6afa70fba6854240cf4807b5f9433b3f44ed30811e307c"
+      "plugins/plugin-manager/info.toml": "d08b9dc72e63042a39ff3f029f06e650d48cd716881c5593ca57a4cccc103ac7",
+      "plugins/plugin-manager/main.as": "bc2b7d1997a0b8b2aaba7782fa8f0fe22e42a1353b50877bc934c0b524508ba0"
     }
   }
 }
