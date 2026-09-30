@@ -1494,6 +1494,45 @@ void RegisterTrack()
         c.insertLast(Is(!Draw::Show(glow, true), "Draw::Clear: Draw::Show after it answered true"));
         return All(c);
     });
+    Add("race", "Draw models and effects", "Draw::Model,Draw::Turn,Draw::Scale,Draw::Effect,Draw::Sound,Camera::Shake", function() {
+        double x, y, z;
+        if (!Race::BallPosition(x, y, z))
+            return "no ball position to draw near";
+        int model = Draw::Model(Plugins::Folder() + "shapes.txt");
+        if (model <= 0)
+            return "Draw::Model(shapes.txt) " + model;
+        const string wave = "/Game/Packs/Vefects/Easy_Shockwaves_VFX/VFX/Shockwaves/Particles/VFX_Shockwave_01_White_1s.VFX_Shockwave_01_White_1s";
+        array<string> c = {Is(Draw::Model(Plugins::Folder() + "missing.txt") == 0, "Draw::Model of a missing file not 0"),
+                           Is(Draw::Move(model, x, y, z + 150), "Draw::Move of a model false"), Is(Draw::Turn(model, 10, 45, 0), "Draw::Turn false"),
+                           Is(Draw::Scale(model, 0.5), "Draw::Scale false"), Is(Draw::Effect(wave, x, y, z - 47, 0.5), "Draw::Effect false"),
+                           Is(!Draw::Effect("/Game/NoSuchEffect.NoSuchEffect", x, y, z), "Draw::Effect of a missing system true"),
+                           Is(Draw::Sound("/Game/Sound/Gameplay/SFX_SoftPop.SFX_SoftPop", 0.3), "Draw::Sound false"),
+                           Is(Camera::Shake(0.2), "Camera::Shake false")};
+        Draw::Remove(model);
+        c.insertLast(Is(!Draw::Turn(model, 0, 0, 0), "Draw::Remove: Draw::Turn after it answered true"));
+        return All(c);
+    });
+    Add("race", "Race::NextBounce", "Race::NextBounce", function() {
+        double s, x, y, z, nx, ny, nz;
+        bool ground;
+        if (step == 0)
+        {
+            while (Race::NextBounce(s, x, y, z, nx, ny, nz, ground)) {}     // the settling bounces before this test
+            Console::Run("fling 0 0 1200");       // up, to land again
+            step = 1;
+            return WAIT;
+        }
+        while (Race::NextBounce(s, x, y, z, nx, ny, nz, ground))
+        {
+            double bx, by, bz;
+            Race::BallPosition(bx, by, bz);
+            if (!ground || nz < 0.5)
+                continue;
+            array<string> c = {Is(s > 0 && s <= 1, "strength " + s), Is(Math::abs(bz - z - 47.5) < 60, "contact " + z + " below the ball at " + bz)};
+            return All(c);
+        }
+        return Elapsed() > 6 ? "no ground bounce within 6 s of a fling up" : WAIT;
+    }, 15);
     Add("race", "Camera", "Camera::Project,Camera::Take,Camera::Set,Camera::Release,Camera::IsTaken", function() {
         double x, y, z;
         if (!Race::BallPosition(x, y, z))

@@ -9,6 +9,7 @@ commands.txt lines:
     sleep <seconds>
     wait <regex>          wait (up to 60 s) for a host.log line matching the regex
     shot <name>           screenshot to %LOCALAPPDATA%/Ballest/Saved/PluginManager/<name>.png
+    quick <command>       a command without the 1.5 s wait after it (to time a screenshot)
     anything else         written to the host's test_command.txt (see src/host/main.cpp)
 Prints every host.log line produced. Never touches a game the user is running (unless --force). --attach sends the
 commands to a game a previous --keep run left open, without restarting it.
@@ -92,6 +93,9 @@ def main():
             out = subprocess.run(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(SHOT),
                                   str(DATA / f"{line.split()[1]}.png")], capture_output=True, text=True)
             print("  screenshot:", (out.stdout or out.stderr).strip()[:150])
+        elif line.startswith("quick "):          # a command without the wait after it (timing a screenshot)
+            (DATA / "test_command.txt").write_text(line[6:], encoding="utf-8")
+            time.sleep(0.2)
         else:
             (DATA / "test_command.txt").write_text(line, encoding="utf-8")
             time.sleep(1.5)

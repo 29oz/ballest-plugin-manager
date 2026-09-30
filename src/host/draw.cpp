@@ -1,7 +1,11 @@
 #include "draw.hpp"
 
+#include <cmath>
 #include <cstring>
 #include <map>
+#include <memory>
+
+#include "cosmetics.hpp"
 
 #include "game.hpp"
 #include "log.hpp"
@@ -16,6 +20,8 @@ struct Shape {
     int owner = -1;
     eng::Weak actor;
     eng::Weak material;                 // its dynamic material, once Glow has found it
+    std::shared_ptr<models::Model> model;   // a model's (Model): what it is, and its parts built on the actor
+    std::shared_ptr<models::Built> built;
 };
 std::map<int, Shape> gShapes;
 int gNextId = 1;
@@ -39,9 +45,19 @@ Obj Actor(int owner, int id) {
 int Keep(int owner, Obj actor) {
     if (!actor) return 0;
     const int id = gNextId++;
-    gShapes[id] = {owner, eng::MakeWeak(actor)};
+    gShapes[id] = {owner, eng::MakeWeak(actor), {}, nullptr, nullptr};
     return id;
 }
+
+// A shape's actor and a model's parts go together.
+void Destroy(Shape& shape) {
+    if (shape.built) models::Destroy(*shape.built);
+    if (Obj a = eng::Get(shape.actor)) eng::Call(a, "K2_DestroyActor");
+}
+
+struct Vec3d {
+    double x, y, z;
+};
 
 Obj Pawn() {
     Obj controller = game::PlayerController();
@@ -60,6 +76,9 @@ void ViewThrough(Obj target) {
 }  // namespace
 
 void Frame() {
+    // Models' spinning groups and animations (no ball: as still).
+    for (auto& [id, shape] : gShapes)
+        if (shape.built && shape.model && eng::Get(shape.actor)) models::Animate(*shape.model, *shape.built, nullptr, game::Seconds());
     if (game::Generation() == gGeneration) return;
     gGeneration = game::Generation();
     gShapes.clear();                    // their actors went with the old map
@@ -112,24 +131,112 @@ bool Fade(int owner, int id, float opacity) {
     return material && models::SetOpacity(material, opacity);
 }
 
+int Model(int owner, const std::string& text, std::string* error) {
+    auto model = std::make_shared<models::Model>();
+    if (!models::Parse(text, model.get(), error)) return 0;
+    Obj holder = models::SpawnHolder();
+    Obj root = holder ? eng::ReadObj(holder, "DynamicMeshComponent") : nullptr;
+    if (!root) {
+        *error = "the model's actor could not be made";
+        return 0;
+    }
+    eng::Call(root, "SetCollisionEnabled", uint8_t{0});
+    const int id = Keep(owner, holder);
+    gShapes[id].model = model;
+    gShapes[id].built = std::make_shared<models::Built>(models::Build(*model, root));
+    return id;
+}
+
+bool Turn(int owner, int id, double pitch, double yaw, double roll) {
+    Obj a = Actor(owner, id);
+    if (!a) return false;
+    eng::Params p(eng::FunctionOn(a, "K2_SetActorRotation"));
+    p.Set("NewRotation", Rot{pitch, yaw, roll});
+    p.Set("bTeleportPhysics", uint8_t{1});
+    return eng::Invoke(a, p);
+}
+
+bool Scale(int owner, int id, double scale) {
+    Obj a = Actor(owner, id);
+    return a && eng::Call(a, "SetActorScale3D", Vec3d{scale, scale, scale}).Invoked();
+}
+
+bool Effect(const std::string& system, double x, double y, double z, double scale, double nx, double ny, double nz) {
+    Obj asset = system.empty() ? nullptr : cosmetics::LoadAsset(eng::Widen(system));
+    Obj controller = game::PlayerController();
+    if (!asset || !controller) return false;
+    // Up along the normal: pitch and roll from it (yaw left as it is).
+    const double len = std::sqrt(nx * nx + ny * ny + nz * nz);
+    Rot rot{0, 0, 0};
+    if (len > 0) {
+        rot.pitch = std::atan2(nx / len, nz / len) * 57.29577951308232;
+        rot.roll = -std::atan2(ny / len, std::sqrt(nx * nx + nz * nz) / len) * 57.29577951308232;
+    }
+    Obj lib = eng::FindCdo("NiagaraFunctionLibrary");
+    eng::Params p(eng::FunctionOn(lib, "SpawnSystemAtLocation"));
+    p.Set("WorldContextObject", controller);
+    p.Set("SystemTemplate", asset);
+    p.Set("Location", Vec3d{x, y, z});
+    p.Set("Rotation", rot);
+    p.Set("Scale", Vec3d{scale, scale, scale});
+    p.Set("bAutoDestroy", uint8_t{1});
+    p.Set("bAutoActivate", uint8_t{1});
+    return eng::Invoke(lib, p) && p.ReturnObj();
+}
+
+bool Sound(const std::string& sound, double volume, double pitch) {
+    Obj asset = sound.empty() ? nullptr : cosmetics::LoadAsset(eng::Widen(sound));
+    Obj controller = game::PlayerController();
+    if (!asset || !controller) return false;
+    Obj statics = eng::FindCdo("GameplayStatics");
+    eng::Params p(eng::FunctionOn(statics, "PlaySound2D"));
+    p.Set("WorldContextObject", controller);
+    p.Set("Sound", asset);
+    p.Set("VolumeMultiplier", static_cast<float>(volume));
+    p.Set("PitchMultiplier", static_cast<float>(pitch));
+    return eng::Invoke(statics, p);
+}
+
+bool Shake(double scale) {
+    static eng::Weak shakeClass;
+    Obj cls = eng::Get(shakeClass);
+    if (!cls) {
+        cls = cosmetics::LoadAsset(L"/Game/Art/VFX/CameraShake/Shake_BallestCam.Shake_BallestCam_C");
+        if (cls) cosmetics::KeepAlive(cls);
+        shakeClass = eng::MakeWeak(cls);
+    }
+    Obj controller = game::PlayerController();
+    Obj manager = controller ? eng::ReadObj(controller, "PlayerCameraManager") : nullptr;
+    if (!cls || !manager) return false;
+    eng::Params p(eng::FunctionOn(manager, "StartCameraShake"));
+    p.Set("ShakeClass", cls);
+    p.Set("Scale", static_cast<float>(scale));
+    return eng::Invoke(manager, p);
+}
+
 int Adopt(int owner, Obj actor) { return Keep(owner, actor); }
 Obj ActorOf(int owner, int id) { return Actor(owner, id); }
 
 bool Show(int owner, int id, bool shown) {
     Obj a = Actor(owner, id);
-    return a && eng::Call(a, "SetActorHiddenInGame", static_cast<uint8_t>(!shown)).Invoked();
+    if (!a) return false;
+    auto it = gShapes.find(id);
+    if (it->second.built)                           // a model's parts are actors of their own, attached to it
+        for (Obj part : models::Actors(*it->second.built)) eng::Call(part, "SetActorHiddenInGame", static_cast<uint8_t>(!shown));
+    return eng::Call(a, "SetActorHiddenInGame", static_cast<uint8_t>(!shown)).Invoked();
 }
 
 void Remove(int owner, int id) {
-    if (Obj a = Actor(owner, id)) eng::Call(a, "K2_DestroyActor");
     auto it = gShapes.find(id);
-    if (it != gShapes.end() && it->second.owner == owner) gShapes.erase(it);
+    if (it == gShapes.end() || it->second.owner != owner) return;
+    Destroy(it->second);
+    gShapes.erase(it);
 }
 
 void Clear(int owner) {
     for (auto it = gShapes.begin(); it != gShapes.end();) {
         if (it->second.owner == owner) {
-            if (Obj a = eng::Get(it->second.actor)) eng::Call(a, "K2_DestroyActor");
+            Destroy(it->second);
             it = gShapes.erase(it);
         } else {
             ++it;

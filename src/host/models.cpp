@@ -791,6 +791,8 @@ Obj SpawnMeshActor(Obj worldContext) {
 
 }  // namespace
 
+Obj SpawnHolder() { return SpawnMeshActor(game::PlayerController()); }
+
 // Memory from the engine's allocator for the mesh buffers (a padded string donates its buffer, as Points does). Kept
 // and reused: AppendBuffersToMesh only reads them.
 struct EngineBuffer {

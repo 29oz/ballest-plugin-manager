@@ -141,6 +141,7 @@ struct Colour {
 };
 eng::Obj SpawnTube(const std::vector<std::array<double, 3>>& path, double radius, const Colour& colour);   // along the points
 eng::Obj SpawnBall(double radius, const Colour& colour);
+eng::Obj SpawnHolder();                 // an empty mesh actor in the world, for a model built on its root component
 std::vector<eng::Obj> Actors(const Built& built);       // every actor of a built model (groups and frames)
 // An empty mesh actor in this colour (tinted glass when see-through), and a tube added to one: many tubes in one mesh
 // are one object to draw. sides: of the tube's cross-section.

@@ -175,7 +175,7 @@ mesh cap.glb size=36 rot=-10.7,-141.9,8.5
 If a file can't be read, the log says why (a missing `.bin`, compression, an animation that isn't there, with the
 names of those that are).
 
-## Extras (arms)
+## Extras (arms, bounce)
 
 Extras are new kinds of cosmetics, each in a slot of its own, worn with the ball and hat (host 0.19.0 and newer). The
 first is **arms**, added through [Cosmetic Kit Plus](https://github.com/AnythingGoes-ballest/ballest-cosmetic-kit-plus).
@@ -196,6 +196,27 @@ group armL on=body pivot=0,-52,5 swing=y angle=35
 capsule skin r=5 len=20 at=0,-54,5 rot=180,0,0
 group armR on=body pivot=0,52,5 swing=y angle=35 phase=180
 capsule skin r=5 len=20 at=0,54,5 rot=180,0,0
+```
+
+The second is **bounce**: an effect when the ball lands or hits a wall (host 0.20.0 and newer). A bounce tile has no
+model; the plugin that adds it plays the effect while it's worn. Each frame it reads the bounces with
+[Race::NextBounce](../reference/api/race.md) (where, which way the surface faces, and how hard, from 0 to 1) and plays
+the game's particle effects and sounds there (`Draw::Effect`, `Draw::Sound`), models of its own (`Draw::Model`) and a
+camera shake. [Example Bounce](https://github.com/AnythingGoes-ballest/ballest-example-bounce) has ten, each soft,
+medium or hard by the hit.
+
+```angelscript
+import bool AddBounce(const string &in, const string &in, const string &in) from "cosmetic-kit-plus";
+
+void Update(float dt)
+{
+    double s, x, y, z, nx, ny, nz;
+    bool ground;
+    bool worn = Cosmetics::EquippedExtra("bounce") == "my-bounce.boom";
+    while (Race::NextBounce(s, x, y, z, nx, ny, nz, ground))
+        if (worn)
+            Draw::Effect("/Game/Art/NS_BallExplosion.NS_BallExplosion", x, y, z, 0.3 + s, nx, ny, nz);
+}
 ```
 
 ## Goal explosions

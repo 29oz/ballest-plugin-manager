@@ -388,6 +388,16 @@ void Run(const std::string& cmd) {
              Report(c + (race::MoveBall(std::atof(Arg(a, 1).c_str()), std::atof(Arg(a, 2).c_str()), std::atof(Arg(a, 3).c_str()))
                              ? " -> ok" : " -> no ball"));
          }},
+        {"fling", [](const Args& a, const std::string& c) {        // fling <vx> <vy> <vz>: the ball's velocity (cm/s), as a hit gives it
+             eng::Obj pawn = eng::Call(game::PlayerController(), "K2_GetPawn").ReturnObj();
+             eng::Obj sphere = pawn ? eng::ReadObj(pawn, "Sphere") : nullptr;
+             if (!sphere) return Report(c + " -> no ball");
+             struct V { double x, y, z; } v{std::atof(Arg(a, 1).c_str()), std::atof(Arg(a, 2).c_str()), std::atof(Arg(a, 3).c_str())};
+             eng::Params p(eng::FunctionOn(sphere, "SetPhysicsLinearVelocity"));
+             p.Set("NewVel", v);
+             p.Set("bAddToCurrent", uint8_t{0});
+             Report(c + (eng::Invoke(sphere, p) ? " -> ok" : " -> failed"));
+         }},
         {"checkpoints", [](const Args&, const std::string&) {      // the map's checkpoints, the current one, the counters
              Report("checkpoints " + std::to_string(race::CheckpointCount()) + ", current " + std::to_string(race::CurrentCheckpoint()) +
                     " | restarts " + std::to_string(race::Restarts()) + " respawns " + std::to_string(race::Respawns()) +

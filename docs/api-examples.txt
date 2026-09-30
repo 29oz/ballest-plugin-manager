@@ -1316,6 +1316,19 @@ double x, y, z;
 if (Race::BallPosition(x, y, z))
     path.insertLast(x);
 
+== Race::NextBounce
+The next time the ball landed or hit a wall, oldest first; false when there are no more. Each plugin reads its own:
+the first call starts from now, and each bounce is given once. `strength` is how hard the hit was, from 0 (a small
+drop) to 1 (a big landing or a fast wall hit); `x, y, z` is where the ball touched, and `nx, ny, nz` the surface's
+normal there (pointing out of it). `ground` is true for a floor (a normal pointing up), false for a wall. Rolling and
+resting don't count. Read them every frame so none wait. Requires host 0.20.0.
+--
+double s, x, y, z, nx, ny, nz;
+bool ground;
+while (Race::NextBounce(s, x, y, z, nx, ny, nz, ground))
+    if (s > 0.75)
+        Camera::Shake(s);
+
 == Race::HideBall
 Hides the player's own ball while `true` (with the game's special skin actor and the host's cosmetic models on it), and
 gives it back with `false` or when the plugin stops. For a view of the track without it, such as a ghost viewer.
@@ -2175,6 +2188,37 @@ Puts a shape somewhere else: a ball's middle goes to the point; a tube moves by 
 --
 Draw::Move(ball, x, y, z);
 
+== Draw::Model
+Builds a model from a model text file (the [models format](../../guides/cosmetics.md#models)) at the world's origin:
+place it with `Draw::Move`, `Draw::Turn` and `Draw::Scale`. Its spinning groups spin. 0 if the file can't be read or
+has a mistake (the log says which line). Requires host 0.20.0.
+--
+int star = Draw::Model(Plugins::Folder() + "models/star.txt");
+Draw::Move(star, x, y, z + 80);
+
+== Draw::Turn
+Turns a shape: pitch, yaw and roll in degrees, as the engine's rotations are. Requires host 0.20.0.
+--
+Draw::Turn(star, 0, Host::Time() * 180, 0);
+
+== Draw::Scale
+Makes a shape bigger or smaller: 1 is the size it was made. Requires host 0.20.0.
+--
+Draw::Scale(star, 0.5);
+
+== Draw::Effect
+Plays one of the game's particle effects once at a point, by its object path, `scale` times its size and turned to
+face along `nx, ny, nz` (up by default). False if there's no such effect. Custom effect files can't be loaded: the game
+only loads its own packaged content. Requires host 0.20.0.
+--
+Draw::Effect("/Game/Art/NS_BallExplosion.NS_BallExplosion", x, y, z, 0.5);
+
+== Draw::Sound
+Plays one of the game's sounds once, by its object path, not placed in the world. False if there's no such sound.
+Requires host 0.20.0.
+--
+Draw::Sound("/Game/Sound/Gameplay/SFX_SoftPop.SFX_SoftPop", 0.5, 1.2);
+
 == Draw::Show
 Shows or hides a shape.
 --
@@ -2192,6 +2236,11 @@ Draw::Clear();
 
 @@ Camera
 Looking through a camera of your own, and where things are on screen. Everything here needs host 0.14.0.
+
+== Camera::Shake
+Shakes the player's camera the way the game does, `scale` times as hard. Requires host 0.20.0.
+--
+Camera::Shake(0.5);
 
 == Camera::Project
 Where a point in the world shows on screen, in the units windows are placed in (`Window.SetRect`). False when it's

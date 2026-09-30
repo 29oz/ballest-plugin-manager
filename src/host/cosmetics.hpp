@@ -44,8 +44,9 @@ bool AddBfx(const std::string& id, const std::string& name, const std::string& b
             const std::wstring& preview, const std::string& system = "", const std::string& sound = "");
 // An extra: another kind of cosmetic, in a slot of its own ("arms"; lowercase letters, digits, dashes and spaces),
 // worn on the player's own balls with their ball and hat. It is a model (models.hpp's format), built on the ball like a
-// ball's model. Each slot gets a tab of its own on the Customize page, after balls, hats and bfx (a local choice, like
-// custom cosmetics), with a "none" tile first. EquipExtra with "" takes the slot's extra off.
+// ball's model, or "" for none (a tile the adding plugin gives a meaning to, such as a bounce effect it plays). Each slot
+// gets a tab of its own on the Customize page, after balls, hats and bfx (a local choice, like custom cosmetics), with
+// a "none" tile first. EquipExtra with "" takes the slot's extra off.
 bool AddExtra(const std::string& slot, const std::string& id, const std::string& name, const std::wstring& preview,
               const std::string& model);
 bool EquipExtra(const std::string& slot, const std::string& id);

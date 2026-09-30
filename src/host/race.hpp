@@ -33,6 +33,26 @@ bool Complete();                // the run has been finished (the controller's b
 // -1..1; InputJump), whatever keys or controller they use. False off track.
 bool Input(double* x, double* y, bool* jump);
 
+// Bounces: the ball being played hitting the ground or a wall hard enough. Read from BP_RollingBall: its Sphere's
+// OnComponentHit is bound to a Blueprint event of the ball (BndEvt__..._ComponentHitSignature, with the hit's
+// NormalImpulse), which the engine calls through the delegate; that function is wrapped (as the cosmetics wrap the
+// Customize page's handler) to see every hit. (The game's own PlayCollisionSFX is called from Blueprint code, which
+// doesn't go through a function's native entry: wrapping it saw nothing, measured.) Which hits count, and how strong
+// they are, is measured: see kBounce* in race.cpp.
+//   strength: how hard, 0..1 (about: soft below 0.4, medium to 0.75, hard above)
+//   x, y, z: where the ball touched (its middle, less its radius along the push); nx, ny, nz: the push's direction
+//   (the surface's normal, pointing out of it); ground: the push is mostly upward (a floor, not a wall)
+struct Bounce {
+    int serial = 0;                 // 1, 2, 3...: each bounce's own number
+    double strength = 0, impulse = 0;
+    double x = 0, y = 0, z = 0, nx = 0, ny = 0, nz = 1;
+    bool ground = false;
+};
+// The first of the last 64 bounces after serial `after` (0: the oldest kept), false if none. Each reader keeps its own
+// place, so plugins don't take each other's bounces. LatestBounce is the newest's serial (0 before any).
+bool BounceAfter(int after, Bounce* out);
+int LatestBounce();
+
 // The track on screen, read from the race UI once it has filled in (re-read every second until then):
 //   * name and author: the race header (WBP_Header in WBP_RaceUIManager: Title, authorText; the game's own tracks
 //     show the placeholder "playername" as author, which reads as "")

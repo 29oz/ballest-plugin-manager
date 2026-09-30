@@ -26,6 +26,18 @@ bool Move(int owner, int id, double x, double y, double z);
 bool Glow(int owner, int id, float r, float g, float b, float bright);
 // A see-through shape's opacity (0..1), changed in place.
 bool Fade(int owner, int id, float opacity);
+// A model (models.hpp's format, with any 3D model files it names) built at the world's origin; moved, turned, scaled,
+// shown and removed like a shape. Its spinning groups and animations play by themselves. 0 and `error` if it can't be.
+int Model(int owner, const std::string& text, std::string* error);
+bool Turn(int owner, int id, double pitch, double yaw, double roll);
+bool Scale(int owner, int id, double scale);
+// One of the game's Niagara particle effects played once where it is put (it removes itself), `scale` times its size,
+// turned so its up points along (nx, ny, nz).
+bool Effect(const std::string& system, double x, double y, double z, double scale, double nx = 0, double ny = 0, double nz = 1);
+// One of the game's sounds, played once (not placed: as the game's own hit sounds, PlaySound2D).
+bool Sound(const std::string& sound, double volume, double pitch);
+// The game's camera shake (Shake_BallestCam), `scale` times as strong.
+bool Shake(double scale);
 int Adopt(int owner, eng::Obj actor);   // an actor made elsewhere, kept like a shape (moved, shown, removed with it)
 eng::Obj ActorOf(int owner, int id);
 bool Show(int owner, int id, bool shown);

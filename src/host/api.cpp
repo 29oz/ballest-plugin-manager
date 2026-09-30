@@ -14,6 +14,7 @@
 #include <sstream>
 #include <cstring>
 #include <cctype>
+#include <map>
 #include <string>
 #include <utility>
 
@@ -779,6 +780,8 @@ bool HudSetPartColor(const std::string& key, const std::string& part, float r, f
 }
 void HudResetPartColor(const std::string& key, const std::string& part) { hud::ResetPartColor(key, part); }
 
+bool RaceNextBounce(double& strength, double& x, double& y, double& z, double& nx, double& ny, double& nz, bool& ground);
+
 void RegisterRace() {
     e->SetDefaultNamespace("Race");
     Global("bool OnTrack()", asFUNCTION(race::OnTrack));
@@ -806,6 +809,8 @@ void RegisterRace() {
     Global("bool IsPractice()", asFUNCTION(race::Practice));
     Global("void HideBall(bool)", asFUNCTION(RaceHideBall));
     Global("bool BallPosition(double &out, double &out, double &out)", asFUNCTION(RaceBallPosition));
+    Global("bool NextBounce(double &out strength, double &out x, double &out y, double &out z, double &out nx, double &out ny, "
+           "double &out nz, bool &out ground)", asFUNCTION(RaceNextBounce));
 }
 
 void HudHideGame(bool hidden) { hud::HideGame(plugins::Current(), hidden); }
@@ -1128,6 +1133,32 @@ int DrawBall(double radius, float r, float g, float b, bool glow) {
     return draw::Ball(plugins::Current(), radius, r, g, b, glow);
 }
 bool DrawMove(int id, double x, double y, double z) { return draw::Move(plugins::Current(), id, x, y, z); }
+int DrawModel(const std::string& file) {
+    std::string text, error;
+    if (!ModelText(file, &text)) return 0;
+    const int id = draw::Model(plugins::Current(), text, &error);
+    if (!id) hostlog::Write("warn", plugins::CurrentId(), "draw: " + file + ": the model is not valid (" + error + ")");
+    return id;
+}
+bool DrawTurn(int id, double pitch, double yaw, double roll) { return draw::Turn(plugins::Current(), id, pitch, yaw, roll); }
+bool DrawScale(int id, double scale) { return draw::Scale(plugins::Current(), id, scale); }
+bool DrawEffect(const std::string& system, double x, double y, double z, double scale, double nx, double ny, double nz) {
+    return draw::Effect(system, x, y, z, scale, nx, ny, nz);
+}
+bool DrawSound(const std::string& sound, double volume, double pitch) { return draw::Sound(sound, volume, pitch); }
+bool CameraShake(double scale) { return draw::Shake(scale); }
+// Bounces: each plugin reads from its own place in the list (race.hpp), starting from the first call.
+std::map<int, int> gBounceRead;
+bool RaceNextBounce(double& strength, double& x, double& y, double& z, double& nx, double& ny, double& nz, bool& ground) {
+    const int plugin = plugins::Current();
+    auto it = gBounceRead.find(plugin);
+    if (it == gBounceRead.end()) it = gBounceRead.emplace(plugin, race::LatestBounce()).first;
+    race::Bounce b;
+    if (!race::BounceAfter(it->second, &b)) return false;
+    it->second = b.serial;
+    strength = b.strength, x = b.x, y = b.y, z = b.z, nx = b.nx, ny = b.ny, nz = b.nz, ground = b.ground;
+    return true;
+}
 bool DrawShow(int id, bool shown) { return draw::Show(plugins::Current(), id, shown); }
 void DrawRemove(int id) { draw::Remove(plugins::Current(), id); }
 void DrawClear() { draw::Clear(plugins::Current()); }
@@ -1248,7 +1279,14 @@ void RegisterGhosts() {
     Global("bool Show(int, bool)", asFUNCTION(DrawShow));
     Global("void Remove(int)", asFUNCTION(DrawRemove));
     Global("void Clear()", asFUNCTION(DrawClear));
+    Global("int Model(const string &in)", asFUNCTION(DrawModel));
+    Global("bool Turn(int, double pitch, double yaw, double roll)", asFUNCTION(DrawTurn));
+    Global("bool Scale(int, double)", asFUNCTION(DrawScale));
+    Global("bool Effect(const string &in, double x, double y, double z, double scale = 1, double nx = 0, double ny = 0, double nz = 1)",
+           asFUNCTION(DrawEffect));
+    Global("bool Sound(const string &in, double volume = 1, double pitch = 1)", asFUNCTION(DrawSound));
     e->SetDefaultNamespace("Camera");
+    Global("bool Shake(double scale = 1)", asFUNCTION(CameraShake));
     Global("bool Project(double, double, double, float &out, float &out)", asFUNCTION(CameraProject));
     Global("bool Take()", asFUNCTION(CameraTake));
     Global("bool Set(double x, double y, double z, double pitch, double yaw, double fov = 90)", asFUNCTION(CameraSet));

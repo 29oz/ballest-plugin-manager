@@ -1649,7 +1649,7 @@ bool AddExtra(const std::string& slot, const std::string& id, const std::string&
         hostlog::Warn("cosmetics: extra slot '" + slot + "' is not a name of lowercase letters, digits, dashes and spaces");
         return false;
     }
-    if (id.empty() || model.empty()) return false;
+    if (id.empty()) return false;                   // model "": a tile only (a plugin does what it stands for)
     if (FindExtra(slot, id)) return true;            // already added (its plugin was reloaded)
     for (const auto& r : gWaitingExtras)
         if (r.slot == slot && r.id == id) return true;
