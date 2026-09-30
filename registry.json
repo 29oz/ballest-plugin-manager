@@ -103,6 +103,39 @@
       }
     },
     {
+      "id": "fish-bowl",
+      "name": "Fish Bowl",
+      "description": "A ball that is an aquarium: fish swimming round and breathing bubbles over sand, coral, a treasure chest, a castle and swaying seaweed.",
+      "author": "AnythingGoes",
+      "repo": "AnythingGoes-ballest/ballest-fish-bowl",
+      "version": "0.1.0",
+      "commit": "0a47b57464afaf3e5883e7944f7b33de37ff8386",
+      "min_host": "0.17.1",
+      "icon": "icon.png",
+      "dependencies": [
+        "cosmetic-kit"
+      ],
+      "files": {
+        "info.toml": "e6146158ac4dbb0a8e263d3d91fcd1def7be5d48640a87eedf11d8f5aa636ad1",
+        "main.as": "8bdf773032ab9b279cf9451e612f9f55fa0e126940fc2fb9129ea7f7487793a2",
+        "icon.png": "65b04e51522f6275c600550a4f828b9d3dcd0212b4a794cf97965503ad3d66ce",
+        "preview.png": "65b04e51522f6275c600550a4f828b9d3dcd0212b4a794cf97965503ad3d66ce",
+        "models/fish_bowl.txt": "1492f08aa3947dc5c216b533892bd5a3225eb3d7771c7e0463152ad6bfcaa1cd",
+        "models/bubbles.glb": "cf8a4721fd577670436a23c826fb3037afcd328933fa62c586d9c2386aa31a03",
+        "models/clownfish.glb": "d1d0b1f83848337299ef163b7ec5b207b5c34e3933da1367000e1dcd6d856bf1",
+        "models/coral_blue.glb": "aaa52232e5e221ec108dc36be08bc55758b3a78a0ba243b1c6e20e4e6aa0b8d4",
+        "models/coral_orange.glb": "d7de8de4304881a740bee4a03e281c2f0e7e3be62e272608f297ffbac5aded0d",
+        "models/coral_pink.glb": "e9039bf1ddf0fa3ea47af7829f8a4f52ea73f1d5ef3a45f369c2c56249426878",
+        "models/coral_red.glb": "c91c4e3e77681ec52485dbb1b6d7f515f738ccd77c72084deae663487d36ee48",
+        "models/mussel.glb": "f8817117d11677a55e296b6acc16cb3078c7021e18df57e4133c0a6fc8eb9b3d",
+        "models/ocean_chest.glb": "823d881913b581f1226cdcf9e7329558e4f0c0aa66d8c87dbac13546689e55ac",
+        "models/rocks.glb": "f2085fb5edfe6ec33b7fe9dd8969fdc016900c18649b94c9ba703d8413cdcd97",
+        "models/sand.glb": "dac38a318bf073abd55e80cd74767bd00852b614a09c3cfad02df035a7243771",
+        "models/tower.glb": "fb6985609c3ef0ac47b77306d90065e75f31e2f0a985ea475c1aca7f28b8a37d",
+        "models/yellow_tang.glb": "c5724eae43799510667e24d2f32508363cb52e5f57853880257e148bfaaadbcf"
+      }
+    },
+    {
       "id": "fit-window",
       "name": "Fit Window",
       "description": "Maximizes the game's bordered window at startup when it doesn't fit the screen (the title bar above the top, the bottom over the taskbar).",
