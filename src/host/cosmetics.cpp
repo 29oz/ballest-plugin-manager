@@ -404,13 +404,73 @@ void RemoveSection() {
     gSections.clear();
 }
 
-// The sections a tab shows: its custom cosmetics ("" in the list), and on the hats tab one for each extra slot.
+// The sections a tab shows: its custom cosmetics ("" in the list). Extras have tabs of their own (below).
 std::vector<std::string> SectionsOf(int tab) {
     std::vector<std::string> out;
     if (tab >= 0 && tab < 3 && Count(static_cast<Kind>(tab)) > 0) out.push_back("");
-    if (tab == 1)
-        for (const auto& slot : ExtraSlots()) out.push_back(slot);
     return out;
+}
+
+// A tile of the page's own for a kind of cosmetic, shown or not (an extra's tab is built while another tab shows).
+Obj AnyTile(Obj page, Kind kind) {
+    Obj found = nullptr, cls = eng::FindClass(kAssetClass[static_cast<int>(kind)]);
+    ForEachGameTile(page, [&](Obj tile) {
+        if (!found && eng::IsA(eng::ReadObj(tile, "CosmeticData"), cls)) found = tile;
+    });
+    return found;
+}
+
+// One section in a scroll box: a header like the collection's (its accent image and its text, with `label` as the
+// text) and a Border like the collection's around a UniformGridPanel of tiles, one for each custom cosmetic `wanted`
+// takes. The tiles are the game's own tile buttons, built like `refButton` and bound to the page's handlers as it is,
+// so choosing one goes through the game's own handler.
+template <class Wanted>
+Section AddSection(Obj page, Obj scroll, const std::string& label, Obj refButton, Wanted wanted, std::vector<eng::Weak>* tiles,
+                   int* made) {
+    Obj tree = eng::ReadObj(page, "WidgetTree");
+    Obj refHeader = eng::ReadObj(page, "HB_CollectionSubheader"), refText = eng::ReadObj(page, "CollectionCategory_Text");
+    Obj refGrid = eng::ReadObj(page, "CollectionCosmetics_Grid");
+    Obj refBorder = eng::Call(refGrid, "GetParent").ReturnObj();
+    Obj header = w::Spawn("HorizontalBox", tree);
+    for (Obj slot : eng::ReadObjArray(refHeader, "Slots")) {
+        Obj content = eng::ReadObj(slot, "Content");
+        Obj copy = nullptr;
+        if (content == refText) {
+            copy = w::Spawn("TextBlock", tree);
+            w::CopyFont(refText, copy);
+            w::SetText(copy, label);
+        } else if (eng::IsA(content, eng::FindClass("Image"))) {
+            copy = w::Spawn("Image", tree);
+            CopyBrush(content, copy, "Brush");
+            CopyProperty(content, copy, "ColorAndOpacity");
+        }
+        if (!copy) continue;
+        CopySlot(slot, eng::Call(header, "AddChildToHorizontalBox", copy).ReturnObj());
+    }
+    Obj border = w::Spawn("Border", tree), grid = w::Spawn("UniformGridPanel", tree);
+    CopyBrush(refBorder, border, "Background");
+    for (const char* prop : {"BrushColor", "Padding", "HorizontalAlignment", "VerticalAlignment"}) CopyProperty(refBorder, border, prop);
+    for (const char* prop : {"SlotPadding", "MinDesiredSlotWidth", "MinDesiredSlotHeight"}) CopyProperty(refGrid, grid, prop);
+    w::AddChild(border, grid);
+    CopySlot(eng::ReadObj(refHeader, "Slot"), eng::Call(scroll, "AddChild", header).ReturnObj());
+    CopySlot(eng::ReadObj(refBorder, "Slot"), eng::Call(scroll, "AddChild", border).ReturnObj());
+    Obj buttonClass = eng::FindClass("WBP_CustomizeButton_C");
+    int32_t n = 0;
+    for (const auto& c : gCustoms) {
+        Obj asset = eng::Get(c.asset);
+        if (!asset || !wanted(c)) continue;
+        Obj button = eng::Call(Library("WidgetBlueprintLibrary"), "Create", page, buttonClass, game::PlayerController()).ReturnObj();
+        if (!button) continue;
+        CopyProperty(refButton, button, "Type");
+        eng::Call(button, "BuildCustomizationButton", asset, n);
+        CopyBindings(refButton, button, "ColorButtonClicked");
+        CopyBindings(refButton, button, "CosmeticButtonUnhovered");
+        tiles->push_back(eng::MakeWeak(button));
+        CopySlot(eng::ReadObj(refButton, "Slot"), eng::Call(grid, "AddChildToUniformGrid", button, n / kColumns, n % kColumns).ReturnObj());
+        ++n;
+    }
+    *made += n;
+    return {eng::MakeWeak(header), eng::MakeWeak(border), eng::MakeWeak(grid)};
 }
 
 void BuildSection(Obj page, int tab) {
@@ -420,12 +480,10 @@ void BuildSection(Obj page, int tab) {
     gTiles.clear();
     const std::vector<std::string> wanted = SectionsOf(tab);
     if (wanted.empty()) return;
-    Obj tree = eng::ReadObj(page, "WidgetTree");
     Obj refHeader = eng::ReadObj(page, "HB_CollectionSubheader"), refText = eng::ReadObj(page, "CollectionCategory_Text");
     Obj refGrid = eng::ReadObj(page, "CollectionCosmetics_Grid");
-    Obj refBorder = eng::Call(refGrid, "GetParent").ReturnObj();
     Obj scroll = eng::Call(refHeader, "GetParent").ReturnObj();
-    if (!tree || !refHeader || !refText || !refGrid || !refBorder || !scroll) {
+    if (!eng::ReadObj(page, "WidgetTree") || !refHeader || !refText || !refGrid || !eng::Call(refGrid, "GetParent").ReturnObj() || !scroll) {
         hostlog::Warn("cosmetics: the Customize page is not laid out as measured; no custom section");
         return;
     }
@@ -433,63 +491,16 @@ void BuildSection(Obj page, int tab) {
     // collection balls, 3 for goal explosions). Until the page has shown its tiles there is none: tried again later.
     Obj refButton = ShownTile(page, static_cast<Kind>(tab));
     if (!refButton) return;
-    Obj buttonClass = eng::FindClass("WBP_CustomizeButton_C");
-    int32_t total = 0;
     gTileVisibility = eng::Call(refButton, "GetVisibility").ReturnAs<uint8_t>(w::kSelfHitTestInvisible);
-    for (const std::string& slotName : wanted) {
-    // Header: the collection header's widgets (its accent image and its text), with "custom" (or the extra slot's
-    // name) as the text.
-    Obj header = w::Spawn("HorizontalBox", tree);
-    for (Obj slot : eng::ReadObjArray(refHeader, "Slots")) {
-        Obj content = eng::ReadObj(slot, "Content");
-        Obj copy = nullptr;
-        if (content == refText) {
-            copy = w::Spawn("TextBlock", tree);
-            w::CopyFont(refText, copy);
-            w::SetText(copy, slotName.empty() ? "custom" : slotName);
-        } else if (eng::IsA(content, eng::FindClass("Image"))) {
-            copy = w::Spawn("Image", tree);
-            CopyBrush(content, copy, "Brush");
-            CopyProperty(content, copy, "ColorAndOpacity");
-        }
-        if (!copy) continue;
-        CopySlot(slot, eng::Call(header, "AddChildToHorizontalBox", copy).ReturnObj());
-    }
-    // Grid: a Border like the collection's around a UniformGridPanel like it.
-    Obj border = w::Spawn("Border", tree), grid = w::Spawn("UniformGridPanel", tree);
-    CopyBrush(refBorder, border, "Background");
-    for (const char* p : {"BrushColor", "Padding", "HorizontalAlignment", "VerticalAlignment"}) CopyProperty(refBorder, border, p);
-    for (const char* p : {"SlotPadding", "MinDesiredSlotWidth", "MinDesiredSlotHeight"}) CopyProperty(refGrid, grid, p);
-    w::AddChild(border, grid);
-    Obj headerSlot = eng::Call(scroll, "AddChild", header).ReturnObj();
-    Obj borderSlot = eng::Call(scroll, "AddChild", border).ReturnObj();
-    CopySlot(eng::ReadObj(refHeader, "Slot"), headerSlot);
-    CopySlot(eng::ReadObj(refBorder, "Slot"), borderSlot);
-    // The tiles: the game's own tile buttons, built for each custom cosmetic and bound to the page's handlers like the
-    // shown tile, so choosing one goes through the game's own handler.
-    int32_t tiles = 0;
-    for (const auto& c : gCustoms) {
-        Obj asset = eng::Get(c.asset);
-        const bool here = slotName.empty() ? c.kind == static_cast<Kind>(tab) && c.extra.empty() : c.extra == slotName;
-        if (!here || !asset) continue;
-        Obj button = eng::Call(Library("WidgetBlueprintLibrary"), "Create", page, buttonClass, game::PlayerController()).ReturnObj();
-        if (!button) continue;
-        CopyProperty(refButton, button, "Type");
-        eng::Call(button, "BuildCustomizationButton", asset, tiles);
-        CopyBindings(refButton, button, "ColorButtonClicked");
-        CopyBindings(refButton, button, "CosmeticButtonUnhovered");
-        gTiles.push_back(eng::MakeWeak(button));
-        Obj slot = eng::Call(grid, "AddChildToUniformGrid", button, tiles / kColumns, tiles % kColumns).ReturnObj();
-        CopySlot(eng::ReadObj(refButton, "Slot"), slot);
-        ++tiles;
-    }
-    gSections.push_back({eng::MakeWeak(header), eng::MakeWeak(border), eng::MakeWeak(grid)});
-    if (gMode == kPublic)                           // custom cosmetics and extras are only local choices
-        for (Obj widget : {header, border}) w::SetVisibility(widget, w::kCollapsed);
-    total += tiles;
-    }
-    hostlog::Info("cosmetics: " + std::to_string(gSections.size()) + " custom section(s) with " + std::to_string(total) +
-                  " tile(s) on tab " + std::to_string(tab));
+    int total = 0;
+    const Kind kind = static_cast<Kind>(tab);
+    Section section = AddSection(page, scroll, "custom", refButton,
+                                 [&](const Custom& c) { return c.kind == kind && c.extra.empty(); }, &gTiles, &total);
+    gSections.push_back(section);
+    if (gMode == kPublic)                           // custom cosmetics are only local choices
+        for (eng::Weak* weak : {&section.header, &section.border})
+            if (Obj widget = eng::Get(*weak)) w::SetVisibility(widget, w::kCollapsed);
+    hostlog::Info("cosmetics: custom section with " + std::to_string(total) + " tile(s) on tab " + std::to_string(tab));
 }
 
 // --- which cosmetic the player chose ------------------------------------------------------------------------------
@@ -1204,8 +1215,188 @@ void UpdateModeButtons(Obj page) {
     }
 }
 
+
+// --- a tab for each extra slot -------------------------------------------------------------------------------------
+// After the page's own tabs (balls, hats, bfx) come one for each extra slot ("arms"): the game's tab button
+// (WBP_TabButton_C, coloured as the page's own, in the same stack, spaced as the hats tab is). Choosing one hides the
+// page's own list (SizeBox_0, the scroll box's parent in MenuOverlay: read from the page's widget tree) and shows a
+// list of the host's own in its place, with that slot's section: "none" first, then its extras. Extras are local
+// choices, so the page switches to local mode. Choosing one of the page's own tabs (its handler then switches, read
+// from SwitchActiveTab: it makes its tabs active and inactive itself) or public mode brings the page's list back.
+struct ExtraTab {
+    std::string slot;
+    eng::Weak box, tab, hitbox, text;               // box: the tab with a spacer above it, in the page's tab stack
+    bool wasPressed = false;
+};
+std::vector<ExtraTab> gExtraTabs;
+eng::Weak gExtraBox, gExtraScroll;                  // the host's list, in the page's MenuOverlay
+eng::Weak gGameList;                                // the page's list (SizeBox_0), hidden while an extra tab is shown
+uint8_t gGameListVisibility = 0;
+std::string gShownExtra;                            // the extra slot whose tab is shown, or ""
+std::vector<eng::Weak> gExtraTiles;
+bool gGameTabWasPressed[3] = {};
+const char* const kGameTabs[3] = {"Skins_Tab", "Hats_Tab", "BFX_Tab"};
+
+void RemoveExtraTabs() {
+    for (auto& t : gExtraTabs)
+        if (Obj box = eng::Get(t.box)) eng::Call(box, "RemoveFromParent");
+    gExtraTabs.clear();
+}
+
+void BuildExtraTabs(Obj page) {
+    RemoveExtraTabs();
+    Obj stack = eng::ReadObj(page, "PLAYLISTTABS_Stack"), reference = eng::ReadObj(page, "BFX_Tab");
+    Obj tree = eng::ReadObj(page, "WidgetTree");
+    Obj tabClass = eng::FindClass("WBP_TabButton_C");
+    // The hats tab's slot has 14 above and below it (read from the page) and the others none, so the tabs are 14
+    // apart. A StackBoxSlot has no setters on this build (measured: SetPadding missing), so each extra tab is in a
+    // VerticalBox under a 14-high spacer, aligned right as the page's tabs are.
+    double gap = 14;
+    struct Margin {
+        float left, top, right, bottom;
+    } hatsPadding{};
+    if (eng::ReadBytes(eng::ReadObj(eng::ReadObj(page, "Hats_Tab"), "Slot"), "Padding", &hatsPadding, sizeof hatsPadding))
+        gap = hatsPadding.top;
+    if (!stack || !reference || !tabClass || !tree) {
+        static bool logged = false;
+        if (!logged) hostlog::Warn("cosmetics: the Customize page's tabs are not laid out as measured; no extra tabs");
+        logged = true;
+        return;
+    }
+    for (const std::string& slot : ExtraSlots()) {
+        Obj tab = eng::Call(Library("WidgetBlueprintLibrary"), "Create", page, tabClass, game::PlayerController()).ReturnObj();
+        if (!tab) return;
+        // The page's tabs' colours and side, before the button is built (its PreConstruct applies them).
+        for (const char* prop : {"BackgroundActiveColor", "BackgroundInactiveColor", "TextActiveColor", "TextInactiveColor",
+                                 "TextHoverColor", "BubHoveredColor", "BubUnhoveredColor", "bLeftSide"})
+            CopyProperty(reference, tab, prop);
+        Obj box = w::Spawn("VerticalBox", tree), spacer = w::Spawn("Spacer", tree);
+        if (!box || !spacer) return;
+        eng::Call(spacer, "SetSize", w::Vec2{1, gap});
+        eng::Call(box, "AddChildToVerticalBox", spacer);
+        if (Obj tabSlot = eng::Call(box, "AddChildToVerticalBox", tab).ReturnObj()) eng::Call(tabSlot, "SetHorizontalAlignment", w::kAlignEnd);
+        eng::Call(stack, "AddChildToStackBox", box);
+        w::SetVisibility(box, gMode == kLocal ? w::kSelfHitTestInvisible : w::kCollapsed);
+        ExtraTab t;
+        t.slot = slot;
+        t.box = eng::MakeWeak(box);
+        t.tab = eng::MakeWeak(tab);
+        t.hitbox = eng::MakeWeak(eng::ReadObj(tab, "HitBox"));
+        t.text = eng::MakeWeak(eng::ReadObj(tab, "ButtonText"));
+        if (Obj text = eng::Get(t.text)) {
+            if (Obj refText = eng::ReadObj(reference, "ButtonText")) w::CopyFont(refText, text);
+            w::SetText(text, slot);
+        }
+        eng::Call(tab, "SetIsActive", static_cast<uint8_t>(slot == gShownExtra));
+        gExtraTabs.push_back(std::move(t));
+    }
+    if (!gExtraTabs.empty()) hostlog::Info("cosmetics: " + std::to_string(gExtraTabs.size()) + " extra tab(s) on the Customize page");
+}
+
+void ShowGameTabs(Obj page, bool active) {
+    if (active) return;                             // the page's SwitchActiveTab makes them active itself
+    for (const char* name : kGameTabs)
+        if (Obj tab = eng::ReadObj(page, name)) eng::Call(tab, "SetIsActive", uint8_t{0});
+}
+
+void LeaveExtraTab(Obj page, bool switchBack) {
+    if (gShownExtra.empty()) return;
+    gShownExtra.clear();
+    if (Obj box = eng::Get(gExtraBox)) w::SetVisibility(box, w::kCollapsed);
+    if (Obj list = eng::Get(gGameList)) w::SetVisibility(list, gGameListVisibility);
+    for (auto& t : gExtraTabs)
+        if (Obj tab = eng::Get(t.tab)) eng::Call(tab, "SetIsActive", uint8_t{0});
+    if (switchBack && page) {                       // the page's own tab back, as the page does it
+        int32_t tab = 0;
+        eng::ReadBytes(page, "ActiveTabIndex", &tab, sizeof tab);
+        eng::Call(page, "SwitchActiveTab", tab);
+    }
+}
+
+void SetMode(Obj page, int mode);
+
+void ShowExtraTab(Obj page, const std::string& slot) {
+    Obj gameList = Parent(Parent(eng::ReadObj(page, "HB_CollectionSubheader")));
+    Obj panel = Parent(gameList), tree = eng::ReadObj(page, "WidgetTree");
+    if (gMode == kPublic) SetMode(page, kLocal);    // extras are local choices
+    // Extras' tiles are hat tiles (their assets are accessories): the page's tiles are a pool it fills per tab, so the
+    // hats tab is built first (the page's own SwitchActiveTab) to have one to copy; leaving comes back to it.
+    int32_t active = 0;
+    eng::ReadBytes(page, "ActiveTabIndex", &active, sizeof active);
+    if (active != 1 || !AnyTile(page, Kind::Hat)) eng::Call(page, "SwitchActiveTab", int32_t{1});
+    Obj refButton = AnyTile(page, Kind::Hat);
+    if (!gameList || !panel || !tree || !refButton) {
+        hostlog::Warn("cosmetics: the Customize page is not laid out as measured; the " + slot + " tab can't be shown");
+        return;
+    }
+    // The host's list: a SizeBox like the page's (its sizes copied) holding a scroll box, in the same place.
+    Obj box = eng::Get(gExtraBox), scroll = eng::Get(gExtraScroll);
+    if (!box || !scroll || !Parent(box)) {
+        box = w::Spawn("SizeBox", tree);
+        scroll = w::Spawn("ScrollBox", tree);
+        if (!box || !scroll) return;
+        for (const char* prop : {"WidthOverride", "HeightOverride", "MinDesiredWidth", "MinDesiredHeight", "MaxDesiredWidth",
+                                 "MaxDesiredHeight", "bOverride_WidthOverride"})
+            CopyProperty(gameList, box, prop);
+        w::AddChild(box, scroll);
+        Obj slotObj = eng::Call(panel, "AddChildToOverlay", box).ReturnObj();
+        CopySlot(eng::ReadObj(gameList, "Slot"), slotObj);
+        gExtraBox = eng::MakeWeak(box);
+        gExtraScroll = eng::MakeWeak(scroll);
+    }
+    eng::Call(scroll, "ClearChildren");
+    gExtraTiles.clear();
+    const uint8_t visible = eng::Call(refButton, "GetVisibility").ReturnAs<uint8_t>(w::kCollapsed);
+    gTileVisibility = visible == w::kCollapsed ? w::kSelfHitTestInvisible : visible;
+    int made = 0;
+    AddSection(page, scroll, slot, refButton, [&](const Custom& c) { return c.extra == slot; }, &gExtraTiles, &made);
+    if (gShownExtra.empty()) gGameListVisibility = eng::Call(gameList, "GetVisibility").ReturnAs<uint8_t>(0);
+    gGameList = eng::MakeWeak(gameList);
+    w::SetVisibility(gameList, w::kCollapsed);
+    w::SetVisibility(box, w::kSelfHitTestInvisible);
+    gShownExtra = slot;
+    ShowGameTabs(page, false);
+    for (auto& t : gExtraTabs)
+        if (Obj tab = eng::Get(t.tab)) eng::Call(tab, "SetIsActive", static_cast<uint8_t>(t.slot == slot));
+    hostlog::Info("cosmetics: " + slot + " tab with " + std::to_string(made) + " tile(s)");
+}
+
+// The extra tabs' clicks, and the page's own tabs' while an extra tab is shown (the page switches itself then).
+void WatchExtraTabs(Obj page) {
+    for (auto& t : gExtraTabs) {
+        Obj hitbox = eng::Get(t.hitbox);
+        if (!hitbox) continue;
+        const bool pressed = eng::Call(hitbox, "IsPressed").ReturnBool();
+        if (t.wasPressed && !pressed && eng::Call(hitbox, "IsHovered").ReturnBool() && t.slot != gShownExtra) ShowExtraTab(page, t.slot);
+        t.wasPressed = pressed;
+    }
+    for (int i = 0; i < 3; ++i) {
+        Obj hitbox = eng::ReadObj(eng::ReadObj(page, kGameTabs[i]), "HitBox");
+        const bool pressed = hitbox && eng::Call(hitbox, "IsPressed").ReturnBool();
+        if (gGameTabWasPressed[i] && !pressed && !gShownExtra.empty()) LeaveExtraTab(page, false);
+        gGameTabWasPressed[i] = pressed;
+    }
+}
+
+// The extra tab's highlight: the extra worn in its slot, or "none".
+void MarkExtraTiles() {
+    for (const auto& weak : gExtraTiles)
+        if (Obj tile = eng::Get(weak)) {
+            const Custom* c = ByAsset(eng::ReadObj(tile, "CosmeticData"));
+            if (!c) continue;
+            const Custom* worn = WornExtra(c->extra);
+            const bool on = worn ? worn == c : c->none;
+            bool active = false;
+            eng::ReadBool(tile, "Active", &active);
+            if (active != on) eng::Call(tile, "SetIsActive", static_cast<uint8_t>(on));
+            if (eng::Call(tile, "GetVisibility").ReturnAs<uint8_t>(gTileVisibility) != gTileVisibility)
+                eng::Call(tile, "SetVisibility", gTileVisibility);
+        }
+}
+
 void SetMode(Obj page, int mode) {
     if (mode != kPublic && mode != kLocal) return;
+    if (mode == kPublic) LeaveExtraTab(page, true);  // extras are local choices
     gMode = mode;
     for (int i = 0; i < 2; ++i)
         if (Obj tab = eng::Get(gModeButtons[i].tab)) eng::Call(tab, "SetIsActive", static_cast<uint8_t>(i == mode));
@@ -1538,6 +1729,7 @@ void Frame() {
         gPageWasShown = shown;
         if (!eng::Get(gModeBox) || !Parent(eng::Get(gModeBox))) BuildModeButtons(page);
         WatchModeButtons(page);
+        WatchExtraTabs(page);
     }
     Wear();
     static double lastLook = -100;
@@ -1545,6 +1737,16 @@ void Frame() {
     lastLook = game::Seconds();
     if (!page) return;
     UpdateModeButtons(page);
+    // One tab per extra slot, rebuilt when the slots change or the page rebuilt its tabs (ours then lost their parent).
+    const size_t slots = ExtraSlots().size();
+    if (gExtraTabs.size() != slots || (slots > 0 && !Parent(eng::Get(gExtraTabs.front().box)))) BuildExtraTabs(page);
+    for (auto& t : gExtraTabs) {
+        if (Obj text = eng::Get(t.text); text && w::ReadText(text) != t.slot) w::SetText(text, t.slot);   // (PreConstruct)
+        // extras are local choices: their tabs show in local mode only
+        const uint8_t wanted = gMode == kLocal ? w::kSelfHitTestInvisible : w::kCollapsed;
+        if (Obj box = eng::Get(t.box); box && eng::Call(box, "GetVisibility").ReturnAs<uint8_t>(wanted) != wanted) w::SetVisibility(box, wanted);
+    }
+    if (!gShownExtra.empty()) MarkExtraTiles();
     int32_t tab = 0;
     eng::ReadBytes(page, "ActiveTabIndex", &tab, sizeof tab);
     // Rebuilt when the page is new, the tab changed, its sections changed (or could not be built yet), or the game
@@ -1569,6 +1771,19 @@ bool Equip(Kind kind, const std::string& id) {
     gEquipped[static_cast<int>(kind)] = id;
     if (!id.empty() && !gLocalPath[static_cast<int>(kind)].empty()) SetLocalGame(static_cast<int>(kind), nullptr);
     return true;
+}
+
+bool ShowExtraTab(const std::string& slot) {
+    Obj page = eng::Get(gPage);
+    if (!page) return false;
+    if (slot.empty()) LeaveExtraTab(page, true);
+    else ShowExtraTab(page, slot);
+    return slot.empty() || gShownExtra == slot;
+}
+
+bool ClickExtraTile(int index) {
+    Obj tile = index >= 0 && index < static_cast<int>(gExtraTiles.size()) ? eng::Get(gExtraTiles[static_cast<size_t>(index)]) : nullptr;
+    return tile && eng::Call(tile, "BndEvt__WBP_BasicBallSelect_Hitbox_K2Node_ComponentBoundEvent_5_OnButtonClickedEvent__DelegateSignature").Invoked();
 }
 
 bool SetLocalMode(bool local) {
@@ -1597,7 +1812,8 @@ bool ClickTile(int index) {
 namespace {
 // Test: the extra slots, how many each has, and the one worn.
 std::string ExtrasStatus() {
-    std::string out;
+    std::string out = "; extra tabs " + std::to_string(gExtraTabs.size()) + ", shown '" + gShownExtra + "' (" +
+                      std::to_string(gExtraTiles.size()) + " tile(s))";
     for (const auto& slot : ExtraSlots()) {
         int n = 0;
         for (const auto& c : gCustoms) n += c.extra == slot && !c.none ? 1 : 0;

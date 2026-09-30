@@ -262,6 +262,7 @@ bool Parse(const std::string& text, Model* model, std::string* error, const std:
     Group main;
     main.name = "main";
     model->groups.push_back(main);
+    bool implicitMain = true;           // groups[0] is still that one, made here, not one the text named
     std::stringstream lines(text);
     std::string line;
     int number = 0;
@@ -345,7 +346,10 @@ bool Parse(const std::string& text, Model* model, std::string* error, const std:
             if (value("spin", &v)) g.spinAxis = axisOf(v);
             g.speed = num("speed", 0);
             for (const auto& word : w) g.travel |= word == "travel";
-            if (model->groups.size() == 1 && model->groups[0].parts.empty()) model->groups.clear();
+            // The implicit first group goes if nothing was put in it; a group the text named stays even when empty (an
+            // empty travelling group that others are built on: it was dropped, and "on=" then failed, reported).
+            if (implicitMain && model->groups.size() == 1 && model->groups[0].parts.empty()) model->groups.clear();
+            implicitMain = false;
             if (value("on", &v)) {
                 for (size_t i = 0; i < model->groups.size(); ++i)
                     if (model->groups[i].name == v) g.parent = static_cast<int>(i);

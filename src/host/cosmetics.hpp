@@ -44,8 +44,8 @@ bool AddBfx(const std::string& id, const std::string& name, const std::string& b
             const std::wstring& preview, const std::string& system = "", const std::string& sound = "");
 // An extra: another kind of cosmetic, in a slot of its own ("arms"; lowercase letters, digits, dashes and spaces),
 // worn on the player's own balls with their ball and hat. It is a model (models.hpp's format), built on the ball like a
-// ball's model. Each slot gets a section of its own on the Customize page's hats tab (local mode, like custom
-// cosmetics), with a "none" tile first. EquipExtra with "" takes the slot's extra off.
+// ball's model. Each slot gets a tab of its own on the Customize page, after balls, hats and bfx (a local choice, like
+// custom cosmetics), with a "none" tile first. EquipExtra with "" takes the slot's extra off.
 bool AddExtra(const std::string& slot, const std::string& id, const std::string& name, const std::wstring& preview,
               const std::string& model);
 bool EquipExtra(const std::string& slot, const std::string& id);
@@ -60,7 +60,9 @@ void Frame();                   // the custom section on the Customize page, and
 std::string Status();           // for the test channel
 std::vector<eng::Obj> ModelActorsOn(eng::Obj ball);    // the models built on this ball (its sphere and hat slot)
 bool ClickTile(int index);      // test: presses a custom tile of the section on screen (-n: the game's n-th), as a click does
-bool SetLocalMode(bool local);  // test: the Customize page's public/local mode, as its buttons set it; false with no page
+bool SetLocalMode(bool local);
+bool ShowExtraTab(const std::string& slot);    // test: the Customize page's tab of an extra slot ("" for the page's own)
+bool ClickExtraTile(int index);                 // test: presses a tile on the shown extra tab, as a click does  // test: the Customize page's public/local mode, as its buttons set it; false with no page
 
 // Engine helpers the cosmetics need, usable elsewhere.
 eng::Obj LoadAsset(const std::wstring& path);      // an asset by object path, loaded if it is not in memory

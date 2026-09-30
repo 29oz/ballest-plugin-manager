@@ -453,6 +453,15 @@ void Run(const std::string& cmd) {
         {"cosmode", [](const Args& a, const std::string& c) {      // cosmode public|local: the Customize page's mode
              Report(c + (cosmetics::SetLocalMode(Arg(a, 1) == "local") ? " -> ok" : " -> no page"));
          }},
+        {"extratab", [](const Args& a, const std::string& c) {     // extratab <slot> | extratab -: an extra's tab, or the page's own
+             Report(c + (cosmetics::ShowExtraTab(Arg(a, 1) == "-" ? "" : Arg(a, 1)) ? " -> ok" : " -> failed"));
+         }},
+        {"wearextra", [](const Args& a, const std::string& c) {    // wearextra <slot> <id> ("-" for none)
+             Report(c + (cosmetics::EquipExtra(Arg(a, 1), Arg(a, 2) == "-" ? "" : Arg(a, 2)) ? " -> ok" : " -> failed"));
+         }},
+        {"extratile", [](const Args& a, const std::string& c) {    // extratile <n>: presses a tile on the shown extra tab
+             Report(c + (cosmetics::ClickExtraTile(std::atoi(Arg(a, 1).c_str())) ? " -> ok" : " -> failed"));
+         }},
         {"children", [](const Args& a, const std::string&) {       // children <owner class> <property>: a panel's children
              const auto owners = Instances(Arg(a, 1), "Transient");
              if (owners.empty()) return Report("children: no " + Arg(a, 1));
