@@ -42,6 +42,14 @@ bool AddHat(const std::string& id, const std::string& name, const std::string& m
 // `system`, `sound`: another Niagara system and sound than the base explosion's (asset paths), "" for the base's.
 bool AddBfx(const std::string& id, const std::string& name, const std::string& baseExplosion, double scale,
             const std::wstring& preview, const std::string& system = "", const std::string& sound = "");
+// An extra: another kind of cosmetic, in a slot of its own ("arms"; lowercase letters, digits, dashes and spaces),
+// worn on the player's own balls with their ball and hat. It is a model (models.hpp's format), built on the ball like a
+// ball's model. Each slot gets a section of its own on the Customize page's hats tab (local mode, like custom
+// cosmetics), with a "none" tile first. EquipExtra with "" takes the slot's extra off.
+bool AddExtra(const std::string& slot, const std::string& id, const std::string& name, const std::wstring& preview,
+              const std::string& model);
+bool EquipExtra(const std::string& slot, const std::string& id);
+std::string EquippedExtra(const std::string& slot);
 int Count(Kind kind);
 // The custom cosmetic the player wears, per kind ("" for the game's own). Chosen on the Customize page, or set here
 // (a plugin restoring the player's choice); false if there is no such custom cosmetic.

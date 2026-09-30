@@ -175,6 +175,28 @@ mesh cap.glb size=36 rot=-10.7,-141.9,8.5
 If a file can't be read, the log says why (a missing `.bin`, compression, an animation that isn't there, with the
 names of those that are).
 
+## Extras (arms)
+
+Extras are new kinds of cosmetics, each in a slot of its own, worn with the ball and hat (host 0.18.0 and newer). The
+first is **arms**, added through [Cosmetic Kit Plus](https://github.com/AnythingGoes-ballest/ballest-cosmetic-kit-plus).
+Each slot gets a section of its own on the Customize page's **hats** tab in local mode, with a **none** tile first.
+
+An extra is a model, built on the ball like a ball's model: the ball's middle is the origin, its radius is 50, +x is
+forward and +y the ball's right. Put it in a `travel` group so it stays upright and faces where the ball goes, and give
+it swinging groups or an animation to move as the ball rolls. [Example Arms](https://github.com/AnythingGoes-ballest/ballest-example-arms)
+has arms built from shapes and arms cut out of animated characters.
+
+```
+# a pair of stubby arms, swinging as the ball rolls
+material skin plastic #e0a070
+tempo rate=1 run=0.3 max=6
+group body travel
+group armL on=body pivot=0,-52,5 swing=y angle=35
+capsule skin r=5 len=20 at=0,-54,5 rot=180,0,0
+group armR on=body pivot=0,52,5 swing=y angle=35 phase=180
+capsule skin r=5 len=20 at=0,54,5 rot=180,0,0
+```
+
 ## Goal explosions
 
 A custom goal explosion is one of the game's at another size, or with another of the game's effects and sounds. It

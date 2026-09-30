@@ -1070,6 +1070,7 @@ void RegisterUi()
 
 // --- customize: Cosmetics ----------------------------------------------------------------------------------------------------
 string wornBall = "", wornHat = "", wornBfx = "";
+string wornArms;
 
 void RegisterCustomize()
 {
@@ -1117,6 +1118,29 @@ void RegisterCustomize()
         Cosmetics::Equip(Cosmetics::Hat, wornHat);
         Cosmetics::Equip(Cosmetics::Bfx, wornBfx);
         return Is(hat, "Cosmetics::Equipped(Hat) '" + Cosmetics::Equipped(Cosmetics::Hat) + "'");
+    }, 20);
+    Add("customize", "Cosmetics extras", "Cosmetics::AddExtra,Cosmetics::EquipExtra,Cosmetics::EquippedExtra", function() {
+        if (step == 0)
+        {
+            string f = Plugins::Folder();
+            wornArms = Cosmetics::EquippedExtra("api-arms");
+            array<string> c = {Is(Cosmetics::AddExtra("api-arms", "api-tests.arms", "api arms", f + "test.png", f + "shapes.txt"), "Cosmetics::AddExtra answered false"),
+                               Is(!Cosmetics::AddExtra("Bad Slot!", "api-tests.bad-slot", "bad", f + "test.png", f + "shapes.txt"), "Cosmetics::AddExtra with a bad slot name answered true"),
+                               Is(!Cosmetics::EquipExtra("api-arms", "no-such-extra"), "Cosmetics::EquipExtra of a missing extra answered true"),
+                               Is(Cosmetics::EquipExtra("api-arms", "api-tests.arms") && Cosmetics::EquippedExtra("api-arms") == "api-tests.arms",
+                                  "Cosmetics::EquippedExtra '" + Cosmetics::EquippedExtra("api-arms") + "' after Cosmetics::EquipExtra")};
+            string failed = All(c);
+            if (failed != "")
+                return failed;
+            step = 1;
+            return WAIT;
+        }
+        // The menu ball wears it: the host builds its model on the ball.
+        if (!LogSince("cosmetics: built api-tests.arms on"))
+            return WAIT;
+        bool off = Cosmetics::EquipExtra("api-arms", "") && Cosmetics::EquippedExtra("api-arms") == "";
+        Cosmetics::EquipExtra("api-arms", wornArms);
+        return Is(off, "Cosmetics::EquipExtra(\"\") left '" + Cosmetics::EquippedExtra("api-arms") + "'");
     }, 20);
 }
 

@@ -1818,6 +1818,28 @@ The custom cosmetic the player wears, or `""` while it's one of the game's. It c
 --
 Storage::Set("ball", Cosmetics::Equipped(Cosmetics::Ball));
 
+== Cosmetics::AddExtra
+Adds an extra: another kind of cosmetic in a slot of its own (`"arms"`; lowercase letters, digits, dashes and spaces),
+worn on the player's own balls with their ball and hat, like a custom one (local only). It is a model file in the
+[models format](../guides/cosmetics.md#models) or a 3D model file, built on the ball like a ball's model: put it in a
+`travel` group to keep it upright and facing where the ball goes. Each slot gets a section of its own on the Customize
+page's hats tab in local mode, with a "none" tile first. The arguments are the slot, an id, the name on its tile, its
+tile picture and the model. False (and a log line saying why) if it can't be made. Requires host 0.18.0.
+--
+string f = Plugins::Folder();
+Cosmetics::AddExtra("arms", "my-arms.buff", "Buff Arms", f + "buff.png", f + "models/buff_arms.txt");
+
+== Cosmetics::EquipExtra
+Wears an extra in its slot, or `""` to take the slot's extra off. False if there's no such extra. Use it to put back
+what the player wore last time. Requires host 0.18.0.
+--
+Cosmetics::EquipExtra("arms", Storage::Get("arms", ""));
+
+== Cosmetics::EquippedExtra
+The extra worn in a slot, or `""` for none. It changes when the player picks a tile. Requires host 0.18.0.
+--
+Storage::Set("arms", Cosmetics::EquippedExtra("arms"));
+
 @@ Leaderboard
 The leaderboard on the right while you're in a map.
 

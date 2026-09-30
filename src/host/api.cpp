@@ -968,6 +968,15 @@ bool CosmeticsAddBfx(const std::string& id, const std::string& name, const std::
     const std::wstring picture = PluginFile(preview, &ok);
     return ok && scale > 0 && cosmetics::AddBfx(id, name, base, scale, picture, system, sound);
 }
+bool CosmeticsAddExtra(const std::string& slot, const std::string& id, const std::string& name, const std::string& preview,
+                       const std::string& model) {
+    bool ok = false;
+    std::string text;
+    const std::wstring picture = PluginFile(preview, &ok);
+    return ok && ModelText(model, &text) && cosmetics::AddExtra(slot, id, name, picture, text);
+}
+bool CosmeticsEquipExtra(const std::string& slot, const std::string& id) { return cosmetics::EquipExtra(slot, id); }
+std::string CosmeticsEquippedExtra(const std::string& slot) { return cosmetics::EquippedExtra(slot); }
 cosmetics::Kind KindOf(int kind) { return static_cast<cosmetics::Kind>(kind < 0 || kind > 2 ? 0 : kind); }
 int CosmeticsCount(int kind) { return cosmetics::Count(KindOf(kind)); }
 bool CosmeticsEquip(int kind, const std::string& id) { return kind >= 0 && kind <= 2 && cosmetics::Equip(KindOf(kind), id); }
@@ -997,6 +1006,10 @@ void RegisterCosmetics() {
     Global("int Count(Kind)", asFUNCTION(CosmeticsCount));
     Global("bool Equip(Kind, const string &in)", asFUNCTION(CosmeticsEquip));
     Global("string Equipped(Kind)", asFUNCTION(CosmeticsEquipped));
+    Global("bool AddExtra(const string &in, const string &in, const string &in, const string &in, const string &in)",
+           asFUNCTION(CosmeticsAddExtra));
+    Global("bool EquipExtra(const string &in, const string &in)", asFUNCTION(CosmeticsEquipExtra));
+    Global("string EquippedExtra(const string &in)", asFUNCTION(CosmeticsEquippedExtra));
 }
 
 // --- ghosts, drawing and the camera -------------------------------------------------------------------------------

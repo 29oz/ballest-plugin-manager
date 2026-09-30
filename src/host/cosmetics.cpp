@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <map>
 
 #include "game.hpp"
 #include "layout.hpp"
@@ -41,6 +42,10 @@ struct Custom {
     double scale = 1;                               // hats and bfx: the size
     bool hasModel = false;                          // balls and hats: parts with depth or movement, built on the ball
     models::Model model;
+    // Extras: another kind of cosmetic in a slot of its own ("arms"), worn on the ball as well as its ball and hat. Its
+    // asset is a PDA_Accessory_C, so its tile is the game's own and the page's handler takes it (as a hat, put back).
+    std::string extra;
+    bool none = false;                              // an extra slot's "none" tile
 };
 std::vector<Custom> gCustoms;
 struct Request {                                    // made before the game was ready (no player controller yet)
@@ -52,6 +57,14 @@ struct Request {                                    // made before the game was 
 };
 std::vector<Request> gWaiting;
 std::string gEquipped[3];                           // the custom cosmetic worn, per kind, or empty
+struct ExtraRequest {                               // an extra made before the game was ready
+    std::string slot, id, name;
+    std::wstring preview;
+    std::string model;
+};
+std::vector<ExtraRequest> gWaitingExtras;
+std::map<std::string, std::string> gEquippedExtra;  // per extra slot, the extra worn
+bool gFixMenuHat = false;                           // an extra was picked: the page previewed it as a hat (none)
 
 // Public and local choices: the Customize page's two modes. Public is the game's own choice (the profile, which is
 // what hiscores, replays and other players get); local is worn on the player's own balls only, and is a custom
@@ -65,7 +78,11 @@ bool gLocalLoaded = false, gLocalChanged = false;
 const char* const kKindName[3] = {"ball", "hat", "bfx"};
 
 // The section on the page, rebuilt when the page or its tab changes.
-eng::Weak gPage, gSectionPage, gHeader, gBorder, gGrid;
+eng::Weak gPage, gSectionPage;
+struct Section {                                    // a header and a grid of tiles in the page's scroll box
+    eng::Weak header, border, grid;
+};
+std::vector<Section> gSections;
 std::vector<eng::Weak> gTiles;
 uint8_t gTileVisibility = 4;
 int gSectionTab = -1;
@@ -224,8 +241,27 @@ void Added(Custom custom) {
 
 const Custom* Find(Kind kind, const std::string& id) {
     for (const auto& c : gCustoms)
-        if (c.kind == kind && c.id == id && eng::Get(c.asset)) return &c;
+        if (c.kind == kind && c.extra.empty() && c.id == id && eng::Get(c.asset)) return &c;
     return nullptr;
+}
+
+const Custom* FindExtra(const std::string& slot, const std::string& id) {
+    for (const auto& c : gCustoms)
+        if (c.extra == slot && !c.none && c.id == id && eng::Get(c.asset)) return &c;
+    return nullptr;
+}
+
+// The extra slots, in the order their first extra was added.
+std::vector<std::string> ExtraSlots() {
+    std::vector<std::string> out;
+    for (const auto& c : gCustoms)
+        if (!c.extra.empty() && std::find(out.begin(), out.end(), c.extra) == out.end()) out.push_back(c.extra);
+    return out;
+}
+
+const Custom* WornExtra(const std::string& slot) {
+    const auto it = gEquippedExtra.find(slot);
+    return it == gEquippedExtra.end() || it->second.empty() ? nullptr : FindExtra(slot, it->second);
 }
 bool Exists(Kind kind, const std::string& id) {
     for (const auto& r : gWaiting)
@@ -362,16 +398,28 @@ Obj ShownTile(Obj page, Kind kind) {
 }
 
 void RemoveSection() {
-    for (eng::Weak* weak : {&gHeader, &gBorder})
-        if (Obj widget = eng::Get(*weak)) eng::Call(widget, "RemoveFromParent");
-    gHeader = gBorder = gGrid = {};
+    for (auto& section : gSections)
+        for (eng::Weak* weak : {&section.header, &section.border})
+            if (Obj widget = eng::Get(*weak)) eng::Call(widget, "RemoveFromParent");
+    gSections.clear();
+}
+
+// The sections a tab shows: its custom cosmetics ("" in the list), and on the hats tab one for each extra slot.
+std::vector<std::string> SectionsOf(int tab) {
+    std::vector<std::string> out;
+    if (tab >= 0 && tab < 3 && Count(static_cast<Kind>(tab)) > 0) out.push_back("");
+    if (tab == 1)
+        for (const auto& slot : ExtraSlots()) out.push_back(slot);
+    return out;
 }
 
 void BuildSection(Obj page, int tab) {
     RemoveSection();
     gPage = gSectionPage = eng::MakeWeak(page);
     gSectionTab = tab;
-    if (Count(static_cast<Kind>(tab)) == 0) return;
+    gTiles.clear();
+    const std::vector<std::string> wanted = SectionsOf(tab);
+    if (wanted.empty()) return;
     Obj tree = eng::ReadObj(page, "WidgetTree");
     Obj refHeader = eng::ReadObj(page, "HB_CollectionSubheader"), refText = eng::ReadObj(page, "CollectionCategory_Text");
     Obj refGrid = eng::ReadObj(page, "CollectionCosmetics_Grid");
@@ -385,7 +433,12 @@ void BuildSection(Obj page, int tab) {
     // collection balls, 3 for goal explosions). Until the page has shown its tiles there is none: tried again later.
     Obj refButton = ShownTile(page, static_cast<Kind>(tab));
     if (!refButton) return;
-    // Header: the collection header's widgets (its accent image and its text), with "custom" as the text.
+    Obj buttonClass = eng::FindClass("WBP_CustomizeButton_C");
+    int32_t total = 0;
+    gTileVisibility = eng::Call(refButton, "GetVisibility").ReturnAs<uint8_t>(w::kSelfHitTestInvisible);
+    for (const std::string& slotName : wanted) {
+    // Header: the collection header's widgets (its accent image and its text), with "custom" (or the extra slot's
+    // name) as the text.
     Obj header = w::Spawn("HorizontalBox", tree);
     for (Obj slot : eng::ReadObjArray(refHeader, "Slots")) {
         Obj content = eng::ReadObj(slot, "Content");
@@ -393,7 +446,7 @@ void BuildSection(Obj page, int tab) {
         if (content == refText) {
             copy = w::Spawn("TextBlock", tree);
             w::CopyFont(refText, copy);
-            w::SetText(copy, "custom");
+            w::SetText(copy, slotName.empty() ? "custom" : slotName);
         } else if (eng::IsA(content, eng::FindClass("Image"))) {
             copy = w::Spawn("Image", tree);
             CopyBrush(content, copy, "Brush");
@@ -414,13 +467,11 @@ void BuildSection(Obj page, int tab) {
     CopySlot(eng::ReadObj(refBorder, "Slot"), borderSlot);
     // The tiles: the game's own tile buttons, built for each custom cosmetic and bound to the page's handlers like the
     // shown tile, so choosing one goes through the game's own handler.
-    Obj buttonClass = eng::FindClass("WBP_CustomizeButton_C");
     int32_t tiles = 0;
-    gTiles.clear();
-    gTileVisibility = eng::Call(refButton, "GetVisibility").ReturnAs<uint8_t>(w::kSelfHitTestInvisible);
     for (const auto& c : gCustoms) {
         Obj asset = eng::Get(c.asset);
-        if (c.kind != static_cast<Kind>(tab) || !asset) continue;
+        const bool here = slotName.empty() ? c.kind == static_cast<Kind>(tab) && c.extra.empty() : c.extra == slotName;
+        if (!here || !asset) continue;
         Obj button = eng::Call(Library("WidgetBlueprintLibrary"), "Create", page, buttonClass, game::PlayerController()).ReturnObj();
         if (!button) continue;
         CopyProperty(refButton, button, "Type");
@@ -432,12 +483,13 @@ void BuildSection(Obj page, int tab) {
         CopySlot(eng::ReadObj(refButton, "Slot"), slot);
         ++tiles;
     }
-    gHeader = eng::MakeWeak(header);
-    gBorder = eng::MakeWeak(border);
-    gGrid = eng::MakeWeak(grid);
-    if (gMode == kPublic)                           // custom cosmetics are only local choices
+    gSections.push_back({eng::MakeWeak(header), eng::MakeWeak(border), eng::MakeWeak(grid)});
+    if (gMode == kPublic)                           // custom cosmetics and extras are only local choices
         for (Obj widget : {header, border}) w::SetVisibility(widget, w::kCollapsed);
-    hostlog::Info("cosmetics: custom section with " + std::to_string(tiles) + " tile(s) on tab " + std::to_string(tab));
+    total += tiles;
+    }
+    hostlog::Info("cosmetics: " + std::to_string(gSections.size()) + " custom section(s) with " + std::to_string(total) +
+                  " tile(s) on tab " + std::to_string(tab));
 }
 
 // --- which cosmetic the player chose ------------------------------------------------------------------------------
@@ -481,7 +533,10 @@ void HookedHandler(Obj context, uint8_t* frame, void* result) {
     Obj taken = nullptr;
     eng::ReadBytes(context, kToSave[kind], &taken, sizeof taken);
     eng::WriteBytes(context, kToSave[kind], &pending, sizeof pending);
-    if (c) {
+    if (c && !c->extra.empty()) {                   // an extra (or its slot's "none"): the hat stays as it is
+        gEquippedExtra[c->extra] = c->none ? "" : c->id;
+        gFixMenuHat = true;
+    } else if (c) {
         gEquipped[kind] = c->id;
         SetLocalGame(kind, nullptr);
     } else if (taken != data) {
@@ -732,11 +787,13 @@ void WearBall(Obj ball, Obj sphere, const Custom* custom) {
     }
 }
 
-// Models built on a component (the ball's sphere, or its hat slot), one per component.
+// Models built on a component (the ball's sphere, or its hat slot): one per component and slot ("" for the ball's or
+// the hat's own, an extra slot's name for an extra, which is built on the sphere beside the ball's).
 struct ModelOn {
     eng::Weak component;
     std::string id;
     models::Built built;
+    std::string slot;
 };
 std::vector<ModelOn> gModels;
 
@@ -753,25 +810,25 @@ std::vector<Obj> ModelActorsOn(Obj ball) {
 }
 
 namespace {
-void RemoveModel(Obj component) {
+void RemoveModel(Obj component, const std::string& slot = "") {
     for (size_t i = 0; i < gModels.size(); ++i)
-        if (eng::Get(gModels[i].component) == component) {
+        if (eng::Get(gModels[i].component) == component && gModels[i].slot == slot) {
             models::Destroy(gModels[i].built);
             gModels.erase(gModels.begin() + static_cast<std::ptrdiff_t>(i));
             return;
         }
 }
 
-void WearModel(Obj component, const Custom* c, Obj ball) {
+void WearModel(Obj component, const Custom* c, Obj ball, const std::string& slot = "") {
     ModelOn* on = nullptr;
     for (auto& m : gModels)
-        if (eng::Get(m.component) == component) on = &m;
+        if (eng::Get(m.component) == component && m.slot == slot) on = &m;
     if (on && (on->id != c->id || !on->built.Alive())) {
-        RemoveModel(component);
+        RemoveModel(component, slot);
         on = nullptr;
     }
     if (!on) {
-        gModels.push_back({eng::MakeWeak(component), c->id, models::Build(c->model, component)});
+        gModels.push_back({eng::MakeWeak(component), c->id, models::Build(c->model, component), slot});
         on = &gModels.back();
         if (on->built.actors.empty()) return;
         hostlog::Info("cosmetics: built " + c->id + " on " + eng::PathOf(component));
@@ -957,6 +1014,12 @@ void Wear() {
             WearBall(actor, sphere, custom);
             if (custom && custom->hasModel) WearModel(sphere, custom, actor);
             else RemoveModel(sphere);
+            // Extras (arms, ...): built on the sphere beside the ball's own model, local only like custom cosmetics.
+            for (const std::string& slotName : ExtraSlots()) {
+                const Custom* extra = local ? WornExtra(slotName) : nullptr;
+                if (extra && extra->hasModel) WearModel(sphere, extra, actor, slotName);
+                else RemoveModel(sphere, slotName);
+            }
         }
         if (Obj slot = eng::ReadObj(actor, "AccessorySlot")) {
             if (Obj accessory = local ? gameHat : nullptr) {
@@ -967,8 +1030,13 @@ void Wear() {
                 if (Obj own = PublicChoice(actor, menu, 1)) SetHatMesh(slot, HatMesh(own));
             }
             WearHat(actor, slot, local ? hat : nullptr);
+            // An extra's tile is an accessory, so the page previewed "no hat" on the menu ball when it was picked: the
+            // hat the ball should show goes back on (a custom or local game hat is put back above, each frame).
+            if (menu && gFixMenuHat && !(local && (hat || gameHat)))
+                if (Obj own = PublicChoice(actor, menu, 1)) SetHatMesh(slot, HatMesh(own));
         }
     }
+    gFixMenuHat = false;
     gForced.erase(std::remove_if(gForced.begin(), gForced.end(), [](const Forced& f) { return !eng::Get(f.ball); }), gForced.end());
     for (size_t i = gModels.size(); i-- > 0;)          // balls gone with their map
         if (!eng::Get(gModels[i].component)) {
@@ -1013,7 +1081,13 @@ void Highlight(Obj page, int tab) {
     auto mark = [&](Obj tile) {
         bool active = false;
         eng::ReadBool(tile, "Active", &active);
-        const bool on = wanted && eng::ReadObj(tile, "CosmeticData") == wanted;
+        Obj data = eng::ReadObj(tile, "CosmeticData");
+        const Custom* c = ByAsset(data);
+        bool on = wanted && data == wanted;
+        if (c && !c->extra.empty()) {               // an extra's section: its worn extra, or "none"
+            const Custom* worn = WornExtra(c->extra);
+            on = worn ? worn == c : c->none;
+        }
         if (active != on) eng::Call(tile, "SetIsActive", static_cast<uint8_t>(on));
     };
     for (const auto& weak : gTiles)
@@ -1135,9 +1209,10 @@ void SetMode(Obj page, int mode) {
     gMode = mode;
     for (int i = 0; i < 2; ++i)
         if (Obj tab = eng::Get(gModeButtons[i].tab)) eng::Call(tab, "SetIsActive", static_cast<uint8_t>(i == mode));
-    // The custom section is only for local choices.
-    for (eng::Weak* weak : {&gHeader, &gBorder})
-        if (Obj widget = eng::Get(*weak)) w::SetVisibility(widget, mode == kLocal ? uint8_t{0} : w::kCollapsed);
+    // The custom sections are only for local choices.
+    for (auto& section : gSections)
+        for (eng::Weak* weak : {&section.header, &section.border})
+            if (Obj widget = eng::Get(*weak)) w::SetVisibility(widget, mode == kLocal ? uint8_t{0} : w::kCollapsed);
     if (!page) return;
     ShowModeOnMenuBall(page);
     int32_t tab = 0;
@@ -1339,8 +1414,88 @@ bool AddBfx(const std::string& id, const std::string& name, const std::string& b
 
 int Count(Kind kind) {
     int n = 0;
-    for (const auto& c : gCustoms) n += c.kind == kind && eng::Get(c.asset) ? 1 : 0;
+    for (const auto& c : gCustoms) n += c.kind == kind && c.extra.empty() && eng::Get(c.asset) ? 1 : 0;
     return n;
+}
+
+namespace {
+// The game's own "no hat" picture (DA_Accessory_None's PreviewTexture), for an extra slot's "none" tile.
+Obj NonePicture() {
+    static eng::Weak picture;
+    static bool looked = false;
+    if (!looked) {
+        looked = true;
+        if (Obj none = eng::FindObjectByName("DA_Accessory_None")) picture = eng::MakeWeak(eng::ReadObj(none, "PreviewTexture"));
+    }
+    return eng::Get(picture);
+}
+
+bool ValidSlot(const std::string& slot) {
+    if (slot.empty() || slot.size() > 20) return false;
+    for (char ch : slot)
+        if (!((ch >= 'a' && ch <= 'z') || (ch >= '0' && ch <= '9') || ch == '-' || ch == ' ')) return false;
+    return true;
+}
+
+// An extra slot's "none" tile, made before its first extra so it comes first.
+void EnsureNone(const std::string& slot) {
+    for (const auto& c : gCustoms)
+        if (c.extra == slot && c.none) return;
+    Obj asset = Create(Kind::Hat, slot + ".none", "none", NonePicture());
+    if (!asset) return;
+    Custom c;
+    c.kind = Kind::Hat;
+    c.extra = slot;
+    c.none = true;
+    c.asset = eng::MakeWeak(asset);
+    gCustoms.push_back(std::move(c));
+}
+}  // namespace
+
+bool AddExtra(const std::string& slot, const std::string& id, const std::string& name, const std::wstring& preview,
+              const std::string& model) {
+    if (!ValidSlot(slot)) {
+        hostlog::Warn("cosmetics: extra slot '" + slot + "' is not a name of lowercase letters, digits, dashes and spaces");
+        return false;
+    }
+    if (id.empty() || model.empty()) return false;
+    if (FindExtra(slot, id)) return true;            // already added (its plugin was reloaded)
+    for (const auto& r : gWaitingExtras)
+        if (r.slot == slot && r.id == id) return true;
+    if (!game::PlayerController()) {
+        gWaitingExtras.push_back({slot, id, name, preview, model});
+        return true;
+    }
+    Custom c;
+    c.kind = Kind::Hat;
+    c.extra = slot;
+    c.id = id;
+    if (!ParseModel(&c, model)) return false;
+    EnsureNone(slot);
+    Obj asset = Create(Kind::Hat, id, name, Texture(preview));
+    if (!asset) return false;
+    if (Obj template_ = LoadAsset(kGhostHatSource)) CopyProperty(template_, asset, "AccessoryGhostMaterial");
+    c.asset = eng::MakeWeak(asset);
+    gCustoms.push_back(std::move(c));
+    gSectionTab = -1;                               // rebuild the sections with it
+    hostlog::Info("cosmetics: added " + slot + " " + id);
+    return true;
+}
+
+bool EquipExtra(const std::string& slot, const std::string& id) {
+    if (!ValidSlot(slot)) return false;
+    if (!id.empty() && !FindExtra(slot, id)) {
+        bool waiting = false;                       // a waiting one is worn once it is made
+        for (const auto& r : gWaitingExtras) waiting |= r.slot == slot && r.id == id;
+        if (!waiting) return false;
+    }
+    gEquippedExtra[slot] = id;
+    return true;
+}
+
+std::string EquippedExtra(const std::string& slot) {
+    const auto it = gEquippedExtra.find(slot);
+    return it == gEquippedExtra.end() ? "" : it->second;
 }
 
 void Frame() {
@@ -1352,6 +1507,11 @@ void Frame() {
             if (r.kind == Kind::Hat) AddHat(r.id, r.name, r.what, r.scale, r.preview, r.model);
             if (r.kind == Kind::Bfx) AddBfx(r.id, r.name, r.what, r.scale, r.preview, r.system, r.sound);
         }
+    }
+    if (!gWaitingExtras.empty() && game::PlayerController()) {
+        const std::vector<ExtraRequest> waiting = std::move(gWaitingExtras);
+        gWaitingExtras.clear();
+        for (const auto& r : waiting) AddExtra(r.slot, r.id, r.name, r.preview, r.model);
     }
     // Local game cosmetics work without any custom one, so this runs from the moment the game is ready.
     if (!game::PlayerController()) return;
@@ -1387,12 +1547,13 @@ void Frame() {
     UpdateModeButtons(page);
     int32_t tab = 0;
     eng::ReadBytes(page, "ActiveTabIndex", &tab, sizeof tab);
-    // Rebuilt when the page is new, the tab changed, or the game rebuilt its lists (our grid then lost its parent).
-    Obj grid = eng::Get(gGrid);
+    // Rebuilt when the page is new, the tab changed, its sections changed (or could not be built yet), or the game
+    // rebuilt its lists (our sections then lost their parent).
+    Obj firstBorder = gSections.empty() ? nullptr : eng::Get(gSections.front().border);
     const char* why = page != eng::Get(gSectionPage) ? "new page"
                       : tab != gSectionTab     ? "tab"
-                      : !grid && Count(static_cast<Kind>(tab)) > 0 ? "no grid"
-                      : grid && !eng::Call(eng::Get(gBorder), "GetParent").ReturnObj() ? "section removed"
+                      : gSections.size() != SectionsOf(tab).size() ? "sections"
+                      : firstBorder && !eng::Call(firstBorder, "GetParent").ReturnObj() ? "section removed"
                                                                                        : nullptr;
     if (why) BuildSection(page, tab);
     // A tile collapses itself when it is constructed; the page shows only the tiles it placed, so ours are shown here.
@@ -1434,6 +1595,17 @@ bool ClickTile(int index) {
 }
 
 namespace {
+// Test: the extra slots, how many each has, and the one worn.
+std::string ExtrasStatus() {
+    std::string out;
+    for (const auto& slot : ExtraSlots()) {
+        int n = 0;
+        for (const auto& c : gCustoms) n += c.extra == slot && !c.none ? 1 : 0;
+        out += "; " + slot + ": " + std::to_string(n) + " (worn '" + EquippedExtra(slot) + "')";
+    }
+    return out;
+}
+
 // Test: the page's pending (public) choices and what the menu ball shows.
 std::string PageStatus() {
     std::string out = "; profile:";
@@ -1467,7 +1639,7 @@ std::string Status() {
            std::to_string(Count(Kind::Bfx)) + " bfx; worn: ball '" + gEquipped[0] + "', hat '" + gEquipped[1] + "', bfx '" +
            gEquipped[2] + "'; section on tab " + std::to_string(gSectionTab) + "; " + std::to_string(gReplaced.size()) +
            " part(s) replaced; mode " + kModeLabel[gMode] + "; local game: ball '" + gLocalPath[0] + "', hat '" + gLocalPath[1] +
-           "', bfx '" + gLocalPath[2] + "'" + PageStatus();
+           "', bfx '" + gLocalPath[2] + "'" + ExtrasStatus() + PageStatus();
 }
 
 }  // namespace cosmetics
