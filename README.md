@@ -11,6 +11,14 @@ game's footer, where you can browse, search, install, update and remove plugins 
 - A plugin that crashes or hangs is stopped on its own. The game keeps running.
 - No UE4SS or other mod loader needed.
 
+## Watch
+
+[![Ballest of Them All Had No Mods… So I Built a Plugin System](https://img.youtube.com/vi/1d29QCz6rbk/maxresdefault.jpg)](https://www.youtube.com/watch?v=1d29QCz6rbk)
+
+[Ballest of Them All Had No Mods… So I Built a Plugin System](https://www.youtube.com/watch?v=1d29QCz6rbk): what the
+plugin manager is, how it came together and what it can do. More videos on my channel,
+[AnythingGoes](https://www.youtube.com/@AnythingGoes-y9n).
+
 ## Install
 
 You need [Git for Windows](https://git-scm.com/download/win), which comes with Git Bash. Close the game first.
