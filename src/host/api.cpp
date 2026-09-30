@@ -982,6 +982,9 @@ bool CosmeticsAddExtra(const std::string& slot, const std::string& id, const std
 }
 bool CosmeticsEquipExtra(const std::string& slot, const std::string& id) { return cosmetics::EquipExtra(slot, id); }
 std::string CosmeticsEquippedExtra(const std::string& slot) { return cosmetics::EquippedExtra(slot); }
+bool CosmeticsPreviewBall(double& x, double& y, double& z, double& radius, double& facing) {
+    return cosmetics::PreviewBall(&x, &y, &z, &radius, &facing);
+}
 cosmetics::Kind KindOf(int kind) { return static_cast<cosmetics::Kind>(kind < 0 || kind > 2 ? 0 : kind); }
 int CosmeticsCount(int kind) { return cosmetics::Count(KindOf(kind)); }
 bool CosmeticsEquip(int kind, const std::string& id) { return kind >= 0 && kind <= 2 && cosmetics::Equip(KindOf(kind), id); }
@@ -1015,6 +1018,8 @@ void RegisterCosmetics() {
            asFUNCTION(CosmeticsAddExtra));
     Global("bool EquipExtra(const string &in, const string &in)", asFUNCTION(CosmeticsEquipExtra));
     Global("string EquippedExtra(const string &in)", asFUNCTION(CosmeticsEquippedExtra));
+    Global("bool PreviewBall(double &out x, double &out y, double &out z, double &out radius, double &out facing)",
+           asFUNCTION(CosmeticsPreviewBall));
 }
 
 // --- ghosts, drawing and the camera -------------------------------------------------------------------------------

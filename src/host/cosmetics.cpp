@@ -1689,6 +1689,35 @@ std::string EquippedExtra(const std::string& slot) {
     return it == gEquippedExtra.end() ? "" : it->second;
 }
 
+bool PreviewBall(double* x, double* y, double* z, double* radius, double* facing) {
+    if (!PageShown(eng::Get(gPage))) return false;
+    Obj menuClass = eng::FindClass("BP_MenuBall_C");
+    for (const auto& weak : gBalls) {
+        Obj actor = eng::Get(weak);
+        Obj sphere = actor && eng::ClassOf(actor) == menuClass ? eng::ReadObj(actor, "Sphere") : nullptr;
+        if (!sphere) continue;
+        struct V {
+            double x, y, z;
+        };
+        const V at = eng::Call(sphere, "K2_GetComponentLocation").ReturnAs<V>();
+        const V scale = eng::Call(sphere, "K2_GetComponentScale").ReturnAs<V>();
+        *x = at.x;
+        *y = at.y;
+        *z = at.z;
+        *radius = 50 * scale.x;                         // the engine's sphere mesh is 50 across its radius
+        *facing = 0;
+        Obj controller = game::PlayerController();
+        if (Obj manager = controller ? eng::ReadObj(controller, "PlayerCameraManager") : nullptr) {
+            struct R {
+                double pitch, yaw, roll;
+            };
+            *facing = eng::Call(manager, "GetCameraRotation").ReturnAs<R>().yaw + 180;
+        }
+        return true;
+    }
+    return false;
+}
+
 void Frame() {
     if (!gWaiting.empty() && game::PlayerController()) {
         const std::vector<Request> waiting = std::move(gWaiting);

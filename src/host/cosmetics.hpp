@@ -51,6 +51,9 @@ bool AddExtra(const std::string& slot, const std::string& id, const std::string&
               const std::string& model);
 bool EquipExtra(const std::string& slot, const std::string& id);
 std::string EquippedExtra(const std::string& slot);
+// While the Customize page is shown: the menu ball's middle, its radius (cm, as it's scaled) and the yaw that faces the
+// camera (degrees), for a plugin previewing a cosmetic on it (a bounce effect played under it). False otherwise.
+bool PreviewBall(double* x, double* y, double* z, double* radius, double* facing);
 int Count(Kind kind);
 // The custom cosmetic the player wears, per kind ("" for the game's own). Chosen on the Customize page, or set here
 // (a plugin restoring the player's choice); false if there is no such custom cosmetic.

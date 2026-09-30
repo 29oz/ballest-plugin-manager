@@ -1848,6 +1848,15 @@ what the player wore last time. Requires host 0.19.0.
 --
 Cosmetics::EquipExtra("arms", Storage::Get("arms", ""));
 
+== Cosmetics::PreviewBall
+While the Customize page is shown: the menu ball's middle, its radius in cm (as it's scaled: 35 on this build) and the
+yaw in degrees that faces the camera. For showing a cosmetic that isn't a model, such as a bounce effect, when it's
+picked. False when the page isn't shown. Requires host 0.20.0.
+--
+double x, y, z, radius, facing;
+if (Cosmetics::PreviewBall(x, y, z, radius, facing))
+    Draw::Effect("/Game/Art/NS_BallExplosion.NS_BallExplosion", x, y, z - radius, 0.3);
+
 == Cosmetics::EquippedExtra
 The extra worn in a slot, or `""` for none. It changes when the player picks a tile. Requires host 0.19.0.
 --

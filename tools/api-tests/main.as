@@ -1119,6 +1119,12 @@ void RegisterCustomize()
         Cosmetics::Equip(Cosmetics::Bfx, wornBfx);
         return Is(hat, "Cosmetics::Equipped(Hat) '" + Cosmetics::Equipped(Cosmetics::Hat) + "'");
     }, 20);
+    Add("customize", "Cosmetics preview ball", "Cosmetics::PreviewBall", function() {
+        double x, y, z, radius, facing;
+        if (!Cosmetics::PreviewBall(x, y, z, radius, facing))
+            return "Cosmetics::PreviewBall false with the Customize page shown";
+        return Is(radius > 10 && radius < 100, "radius " + radius);
+    });
     Add("customize", "Cosmetics extras", "Cosmetics::AddExtra,Cosmetics::EquipExtra,Cosmetics::EquippedExtra", function() {
         if (step == 0)
         {

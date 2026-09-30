@@ -202,7 +202,7 @@ The second is **bounce**: an effect when the ball lands or hits a wall (host 0.2
 model; the plugin that adds it plays the effect while it's worn. Each frame it reads the bounces with
 [Race::NextBounce](../reference/api/race.md) (where, which way the surface faces, and how hard, from 0 to 1) and plays
 the game's particle effects and sounds there (`Draw::Effect`, `Draw::Sound`), models of its own (`Draw::Model`) and a
-camera shake. [Example Bounce](https://github.com/AnythingGoes-ballest/ballest-example-bounce) has ten, each soft,
+camera shake. [Example Bounce](https://github.com/AnythingGoes-ballest/ballest-example-bounce) has eight, each soft,
 medium or hard by the hit.
 
 ```angelscript
@@ -218,6 +218,10 @@ void Update(float dt)
             Draw::Effect("/Game/Art/NS_BallExplosion.NS_BallExplosion", x, y, z, 0.3 + s, nx, ny, nz);
 }
 ```
+
+To show an effect when it's picked, play it under the menu ball: while the Customize page is shown,
+[Cosmetics::PreviewBall](../reference/api/cosmetics.md) gives the ball's middle, its radius and the way that faces the
+camera (host 0.20.0 and newer).
 
 ## Goal explosions
 
