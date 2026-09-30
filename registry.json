@@ -3,19 +3,19 @@
     {
       "id": "clear-tec-balls",
       "name": "Clear-Tec-Balls",
-      "description": "Cosmetic Kit: Glass-Ball",
+      "description": "Includes 2 Balls: Clear, Dots | and 1 Hat: Coors",
       "author": "CryT4x",
       "repo": "Cryt4x/ballest-clear-tec-balls",
-      "version": "1.0.4",
-      "commit": "6587e97e4cd09bb808e07d06ec2c3ba3d88a06e7",
+      "version": "1.0.9",
+      "commit": "0c9e8dbf7f8b7e27a3baac18ee425e781a3d814a",
       "min_host": "0.8.0",
       "icon": "icon.png",
       "dependencies": [
         "cosmetic-kit"
       ],
       "files": {
-        "info.toml": "f4ec9f2f3b6a930a6da6a41323a44e594a232908ecff77f2593b75c18deca7cf",
-        "main.as": "96c41dd4296d71b37a618569db6865fdc5488d4e52e9519414543b5dcbf358a0",
+        "info.toml": "31817a7aa36c99fe0f5b9ec6d887e330d28bbc4ac80e39a7a2f0d65efc337491",
+        "main.as": "57bdeaf5b2b15d9ac48885f1ba7c7856234b4bcff2ac9f55f8584130773425c6",
         "coors_preview.png": "65c103f1148e28b55a6d52706839514e20f5671438df50f6345f0ac48d52532b",
         "dots_preview.png": "de290fb12b605c6b71e3e7c1af144ebedfd7620987c2582b2c18bbd2d93cd84d",
         "glass_preview.png": "74dd19f942d4c9e11baf102180e224747096f561bfa7abdf9f4bbb5477142c84",
