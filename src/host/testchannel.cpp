@@ -29,6 +29,10 @@
 
 namespace testchannel {
 namespace {
+
+long long gHostFrames = 0;              // host frames so far, and where the last "fps" started counting
+long long gFpsFrames = 0;
+double gFpsSince = -1;
 std::vector<std::pair<int, ULONGLONG>> gPostedUps;     // keys posted down, and when to let them go
 
 std::vector<std::string> Words(const std::string& s) {
@@ -388,6 +392,34 @@ void Run(const std::string& cmd) {
         {"teleport", [](const Args& a, const std::string& c) {       // teleport <x> <y> <z>: the ball being played
              Report(c + (race::MoveBall(std::atof(Arg(a, 1).c_str()), std::atof(Arg(a, 2).c_str()), std::atof(Arg(a, 3).c_str()))
                              ? " -> ok" : " -> no ball"));
+         }},
+        {"fps", [](const Args&, const std::string& c) {            // fps: the average frame rate since the last "fps"
+             const double now = game::Seconds();
+             if (gFpsSince >= 0 && now > gFpsSince)
+                 Report(c + " -> " + std::to_string(static_cast<double>(gHostFrames - gFpsFrames) / (now - gFpsSince)) + " frames a second over " +
+                        std::to_string(now - gFpsSince) + " s");
+             else
+                 Report(c + " -> counting from now");
+             gFpsSince = now;
+             gFpsFrames = gHostFrames;
+         }},
+        {"console", [](const Args&, const std::string& c) {        // console <command>: an engine console command (t.MaxFPS 30)
+             const std::wstring command = eng::Widen(c.size() > 8 ? c.substr(8) : "");
+             eng::Obj lib = eng::FindCdo("KismetSystemLibrary");
+             eng::Params p(eng::FunctionOn(lib, "ExecuteConsoleCommand"));
+             p.Set("WorldContextObject", game::PlayerController());
+             p.Set("Command", eng::FString{command.c_str(), static_cast<int32_t>(command.size() + 1), static_cast<int32_t>(command.size() + 1)});
+             Report(c + (eng::Invoke(lib, p) ? " -> ok" : " -> failed"));
+         }},
+        {"spin", [](const Args& a, const std::string& c) {         // spin <x> <y> <z>: the ball's spin (degrees a second)
+             eng::Obj pawn = eng::Call(game::PlayerController(), "K2_GetPawn").ReturnObj();
+             eng::Obj sphere = pawn ? eng::ReadObj(pawn, "Sphere") : nullptr;
+             if (!sphere) return Report(c + " -> no ball");
+             struct V { double x, y, z; } v{std::atof(Arg(a, 1).c_str()), std::atof(Arg(a, 2).c_str()), std::atof(Arg(a, 3).c_str())};
+             eng::Params p(eng::FunctionOn(sphere, "SetPhysicsAngularVelocityInDegrees"));
+             p.Set("NewAngVel", v);
+             p.Set("bAddToCurrent", uint8_t{0});
+             Report(c + (eng::Invoke(sphere, p) ? " -> ok" : " -> failed"));
          }},
         {"playsound", [](const Args&, const std::string& c) {      // playsound <file.wav or game sound path>: Draw::Sound
              Report(c + (draw::Sound(c.size() > 10 ? c.substr(10) : "", 1, 1) ? " -> ok" : " -> failed"));
@@ -778,6 +810,7 @@ void PollFile() {
 }  // namespace
 
 void Frame() {
+    ++gHostFrames;
     // Keys posted with "post": let go when their time is up (the game reads a press and a release, not a state).
     for (auto it = gPostedUps.begin(); it != gPostedUps.end();) {
         if (GetTickCount64() < it->second) {

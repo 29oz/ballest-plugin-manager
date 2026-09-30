@@ -898,6 +898,21 @@ bool Built::Alive() const {
     return !actors.empty();
 }
 
+// An animation frame (one baked pose) shown or put away. Frames are shrunk to nothing rather than hidden: a component made
+// visible again has its render state rebuilt and isn't drawn until the next frame, so hiding the old frame and showing
+// the new one left a frame with no model at all. At 30 fps, where a clip changes frame about every rendered frame, the
+// model flickered out much of the time (measured); a scale change is drawn in the same frame. Measured alternatives:
+// - showing only the frames coming up (a sliding window) rebuilt render state every frame: slower than this;
+// - moving the other frames far out of view flickered again (a 10 km jump in one frame) and was no faster.
+// Keeping a clip's frames visible and shrunk costs about 0.3 ms a frame for a 48-frame model (228 to 213 fps).
+void ShowFrame(Obj component, bool shown) {
+    const double s = shown ? 1.0 : 1e-4;
+    struct V {
+        double x, y, z;
+    } scale{s, s, s};
+    eng::Call(component, "SetRelativeScale3D", scale);
+}
+
 Built Build(const Model& model, Obj parent) {
     Built built;
     built.parent = eng::MakeWeak(parent);
@@ -959,7 +974,7 @@ Built Build(const Model& model, Obj parent) {
                     eng::Call(frameComponent, "SetCollisionEnabled", uint8_t{0});
                     eng::Call(frameComponent, "SetReceivesDecals", uint8_t{0});
                     eng::Call(frameActor, "K2_AttachToComponent", component, std::array<uint8_t, 8>{}, snap, snap, snap, uint8_t{0});
-                    eng::Call(frameComponent, "SetVisibility", uint8_t{0}, uint8_t{0});
+                    ShowFrame(frameComponent, false);
                     flip.frames.push_back(eng::MakeWeak(frameActor));
                 }
             const auto took = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - started).count();
@@ -1083,7 +1098,7 @@ void Animate(const Model& model, Built& built, Obj ballActor, double seconds) {
         auto show = [&](int i, bool on) {
             Obj actor = i >= 0 && i < static_cast<int>(flip.frames.size()) ? eng::Get(flip.frames[static_cast<size_t>(i)]) : nullptr;
             Obj component = actor ? eng::ReadObj(actor, "DynamicMeshComponent") : nullptr;
-            if (component) eng::Call(component, "SetVisibility", static_cast<uint8_t>(on), uint8_t{0});
+            if (component) ShowFrame(component, on);
         };
         show(index, true);
         show(flip.shown, false);
