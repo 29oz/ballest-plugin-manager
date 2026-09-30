@@ -152,6 +152,23 @@
       }
     },
     {
+      "id": "grind-stats",
+      "name": "Grind Stats",
+      "description": "Time spent, restarts, and respawns and falls at each checkpoint, for every map you play, with totals across all of them.",
+      "author": "AnythingGoes",
+      "repo": "AnythingGoes-ballest/ballest-grind-stats",
+      "version": "0.1.0",
+      "commit": "4d3447789aa6fd5f986eada5c49b65667f6fe455",
+      "min_host": "0.18.0",
+      "icon": "icon.png",
+      "dependencies": [],
+      "files": {
+        "info.toml": "cb4e95a5018c08fca157e9772747a7169f17c33684f853341e80c28063cb8933",
+        "main.as": "00fe8f6261c392f0fc5143de7c6e6c165202d9976fa1f0617d2daf58043317b5",
+        "icon.png": "808400fc93e9ec5a79f02d225da684cd949be6fbee0e0bef6accb27a1bdb1d48"
+      }
+    },
+    {
       "id": "grind-timer",
       "name": "Grind Timer",
       "description": "A green Trackmania-style timer of total time racing, with restarts from the beginning counted.",
@@ -372,11 +389,11 @@
     }
   ],
   "host": {
-    "version": "0.17.2",
+    "version": "0.18.0",
     "repo": "AnythingGoes-ballest/ballest-plugin-manager",
-    "commit": "b289cad57de65ea0d56b19ec2b44d2eca773afc6",
-    "dll": "https://github.com/AnythingGoes-ballest/ballest-plugin-manager/releases/download/v0.17.2/version.dll",
-    "dll_sha256": "207a4c842459c3ac73ab0ffa61c6111a146253978a2ce2cc421f72906db90999",
+    "commit": "38b2b561dbd62afb50ea3fa9cdc9783e693502b2",
+    "dll": "https://github.com/AnythingGoes-ballest/ballest-plugin-manager/releases/download/v0.18.0/version.dll",
+    "dll_sha256": "2841f8dbabdd68f4b30cf851473326eafedc4214dc53bbd40197b6c2dcc0e92b",
     "files": {
       "plugins/hello-world/info.toml": "5300e78277bc1e92d4d1626ce17ed15e938f37e692b2271b58c3c9c30b79be40",
       "plugins/hello-world/main.as": "24f510821cb3ea7825bfef6363d92e12fd493b9977038beb9e6c297a692fb23b",
