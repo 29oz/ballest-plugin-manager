@@ -567,9 +567,11 @@ void Run(const std::string& cmd) {
              }
          }},
         {"objprop", [](const Args& a, const std::string&) {       // objprop <Class> <filter> <property>: an object of each
+             std::string prop = Arg(a, 3);                           // the rest of the line: a name may have spaces
+             for (size_t i = 4; i < a.size(); ++i) prop += " " + Arg(a, i);
              for (eng::Obj o : Instances(Arg(a, 1), Arg(a, 2))) {
-                 eng::Obj v = eng::ReadObj(o, Arg(a, 3));
-                 Report(eng::ObjName(o) + " " + Arg(a, 3) + " = " + (v ? eng::ObjName(eng::ClassOf(v)) + " " + eng::PathOf(v) : std::string("null")));
+                 eng::Obj v = eng::ReadObj(o, prop);
+                 Report(eng::ObjName(o) + " " + prop + " = " + (v ? eng::ObjName(eng::ClassOf(v)) + " " + eng::PathOf(v) : std::string("null")));
              }
          }},
         {"listprop", [](const Args& a, const std::string&) {      // listprop <Class> <filter> <property>: strings or floats

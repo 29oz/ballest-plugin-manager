@@ -528,6 +528,7 @@ struct Replaced {
     bool sphereHiddenInGame = false, sphereInvisible = false;  // how the game had hidden the sphere for that actor
     double scale[3] = {1, 1, 1};                    // hats: the slot's own scale
     eng::Weak worn{};                               // hats: the mesh the host put on the slot (none for a model-only hat)
+    eng::Weak dragged{};                            // the menu ball: what its drag turned before (see DragTurns)
 };
 std::vector<Replaced> gReplaced;
 std::vector<eng::Weak> gBalls, gExplosions;
@@ -669,6 +670,20 @@ void PutSkin(Obj ball, Obj sphere, Obj skin, bool menu) {
 
 Obj HatMesh(Obj accessory) { return accessory ? eng::Call(accessory, "GetAccessoryMesh").GetObj("AccessoryMesh") : nullptr; }
 
+// The menu ball's drag turns its "Sphere Component" (read from BP_MenuBall: HandleRotation adds the drag to it). For a
+// skin drawn by its own actor the game points it at that actor's sphere (GetSkinSphere), so with a custom ball over
+// such a skin the drag turned the hidden skin (its shadow moved) and not the custom ball (reported). While a custom
+// ball is worn the drag turns the ball's own sphere, which the custom look and its model are on.
+bool HasDrag(Obj ball) { return eng::FindProp(eng::ClassOf(ball), "Sphere Component").size > 0; }
+
+void DragTurns(Obj ball, Obj sphere, Replaced* r) {
+    if (!r || !HasDrag(ball)) return;
+    Obj now = eng::ReadObj(ball, "Sphere Component");
+    if (now == sphere) return;
+    r->dragged = eng::MakeWeak(now);
+    SetObject(ball, "Sphere Component", sphere);
+}
+
 void WearBall(Obj ball, Obj sphere, const Custom* custom) {
     Obj skinActor = eng::ReadObj(ball, "CustomSkinChild");
     if (skinActor && !eng::IsLive(skinActor)) skinActor = nullptr;
@@ -679,6 +694,7 @@ void WearBall(Obj ball, Obj sphere, const Custom* custom) {
     if (wanted) {
         const bool sphereShown = eng::Call(sphere, "IsVisible").ReturnBool();
         const bool skinShown = skinActor && !Hidden(skinActor);
+        DragTurns(ball, sphere, r);                 // also after the game points it elsewhere again (a page preview)
         if (material == wanted && mesh == Sphere() && sphereShown && !skinShown) return;
         if (!r) {                                    // the game's own look, to put back later
             bool hiddenInGame = false, visible = true;
@@ -688,6 +704,7 @@ void WearBall(Obj ball, Obj sphere, const Custom* custom) {
                                  eng::MakeWeak(IsCustomMaterial(material) ? nullptr : material), eng::MakeWeak(skinActor),
                                  hiddenInGame, !visible});
             r = &gReplaced.back();
+            DragTurns(ball, sphere, r);
         }
         if (skinShown) {
             eng::Call(skinActor, "SetActorHiddenInGame", uint8_t{1});
@@ -709,6 +726,8 @@ void WearBall(Obj ball, Obj sphere, const Custom* custom) {
             if (r->sphereHiddenInGame) eng::Call(sphere, "SetHiddenInGame", uint8_t{1}, uint8_t{0});
             if (r->sphereInvisible) eng::Call(sphere, "SetVisibility", uint8_t{0}, uint8_t{0});
         }
+        if (Obj before = eng::Get(r->dragged); before && HasDrag(ball) && eng::ReadObj(ball, "Sphere Component") == sphere)
+            SetObject(ball, "Sphere Component", before);
         Forget(r);
     }
 }
