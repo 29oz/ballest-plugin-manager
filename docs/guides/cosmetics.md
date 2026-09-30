@@ -177,7 +177,7 @@ names of those that are).
 
 ## Extras (arms)
 
-Extras are new kinds of cosmetics, each in a slot of its own, worn with the ball and hat (host 0.18.0 and newer). The
+Extras are new kinds of cosmetics, each in a slot of its own, worn with the ball and hat (host 0.19.0 and newer). The
 first is **arms**, added through [Cosmetic Kit Plus](https://github.com/AnythingGoes-ballest/ballest-cosmetic-kit-plus).
 Each slot gets a section of its own on the Customize page's **hats** tab in local mode, with a **none** tile first.
 
