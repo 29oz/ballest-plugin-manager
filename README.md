@@ -19,6 +19,9 @@ game's footer, where you can browse, search, install, update and remove plugins 
 plugin manager is, how it came together and what it can do. More videos on my channel,
 [AnythingGoes](https://www.youtube.com/@AnythingGoes-y9n).
 
+The plugin manager is free. If you'd like to support it anyway, you can
+[buy me a coffee](https://buymeacoffee.com/AnythingGoesYT). No pressure :)
+
 ## Install
 
 You need [Git for Windows](https://git-scm.com/download/win), which comes with Git Bash. Close the game first.
