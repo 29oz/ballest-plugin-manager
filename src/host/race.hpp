@@ -17,6 +17,14 @@ void Frame();                   // after game::Frame
 bool OnTrack();                 // a race controller exists (a track is loaded, not the main menu)
 bool Active();                  // a race is running
 int Restarts();                 // restarts from the beginning since the host started
+int Respawns();                 // respawns at a checkpoint from R (not falls) since the host started
+int Falls();                    // falls into a kill zone since the host started (each respawns at a checkpoint or the start)
+// The map's checkpoints (strips and discs, BP_ActualCheckpointBase_C), ordered by position; 0 off track.
+int CheckpointCount();
+bool CheckpointPosition(int index, double* x, double* y, double* z);
+int CurrentCheckpoint();        // the one a respawn goes to (its bCurrent), or -1 (the start)
+bool MoveBall(double x, double y, double z);    // tests only: teleports the ball being played
+bool CheckpointTrigger(int index, double* x, double* y, double* z);    // tests only: where a strip's trigger is
 bool BallPosition(double* x, double* y, double* z);     // the ball being played (also in the editor's test runs)
 bool EditorTesting();           // in the track editor, a test run is on (the camera is on the ball)
 int RunId();                    // the ball's RaceId: a new value for every new run, the same through respawns; -1 off track
@@ -35,6 +43,7 @@ bool Input(double* x, double* y, bool* jump);
 //     the game's own tracks: "map:<map name>"
 struct Track {
     std::string key, name, author;
+    std::string image;              // custom tracks: the .jpg beside the map file, if there is one
     double authorTime = 0;          // seconds, 0 if unknown
     bool custom = false;
 };

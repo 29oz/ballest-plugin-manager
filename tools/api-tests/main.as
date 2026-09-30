@@ -1571,24 +1571,90 @@ void RegisterRace()
         return Is(moved > 100, "Race::BallPosition: the ball moved " + int(moved) + " cm with W held 1.5 s");
     }, 8);
     Add("race", "Race restart", "Race::Restarts", function() {
-        // Backspace restarts from the beginning. Measured on the 2026-09-29 13:27 build: the game counts it 3 to 5 s
-        // after the key; a press during the start countdown, or before the run has begun, is ignored; a second press
-        // while it restarts puts it off again. So: one press, and one more 6.5 s later only if the first was ignored.
+        // A restart from the beginning, through the game's own ManuallyRestartBall (what R does before the first
+        // checkpoint). Measured 2026-09-30: a Backspace posted to the window never reaches the game's restart (the
+        // controller's restart gates all pass; the key is taken before its input action), and this test used to pass
+        // only because the ball, still rolling from the test before, fell off the track about 10 s later. A fall isn't a
+        // restart (Race::Falls), so that no longer counts.
         if (step == 0)
         {
             id1 = Race::Restarts();
-            Console::Run("post 8 200");
+            Console::Run("call BP_MyPlayerController_C ManuallyRestartBall");
             step = 1;
         }
-        if (Race::Restarts() > id1)
+        if (Race::Restarts() == id1 + 1)
             return PASS;
-        if (step == 1 && Elapsed() > 6.5)
+        return Elapsed() > 5 ? "Race::Restarts " + Race::Restarts() + " after a restart, want " + (id1 + 1) : WAIT;
+    }, 8);
+    Add("race", "Race checkpoints, respawns and falls", "Race::CheckpointCount,Race::CheckpointPosition,Race::CurrentCheckpoint,Race::Respawns,Race::Falls", function() {
+        // Measured on Leth Trial 01 (9 checkpoint strips): the ball put in checkpoint 0's trigger (the host's
+        // "checkpoints" test command logs where it is) makes it current, R respawns there, and a fall 300 m off to
+        // the side is counted as a fall and not as an R respawn.
+        if (step == 0)
         {
-            Console::Run("post 8 200");
-            step = 2;
+            if (!Race::IsActive())
+                return Elapsed() > 15 ? "the race isn't running after the restart" : WAIT;     // R counts only while racing
+            int n = Race::CheckpointCount();
+            if (n <= 0)
+                return "Race::CheckpointCount " + n + " on " + Race::TrackKey();
+            double x, y, z;
+            for (int i = 0; i < n; i++)
+                if (!Race::CheckpointPosition(i, x, y, z))
+                    return "Race::CheckpointPosition(" + i + ") false";
+            if (Race::CheckpointPosition(n, x, y, z))
+                return "Race::CheckpointPosition(" + n + ") true, past the last one";
+            if (Race::CurrentCheckpoint() != -1)
+                return "Race::CurrentCheckpoint " + Race::CurrentCheckpoint() + " right after a restart, want -1";
+            Console::Run("checkpoints");
+            step = 1;
+            return WAIT;
         }
-        return Elapsed() > 13 ? "Race::Restarts " + Race::Restarts() + " after two restarts (Backspace), want " + (id1 + 1) : WAIT;
-    }, 15);
+        if (step == 1)
+        {
+            // "  0 at <x> <y> <z>, trigger <x> <y> <z>"
+            string line = LogLineSince("  0 at ");
+            int at = line.findFirst("trigger ");
+            if (at < 0)
+                return Elapsed() > 5 ? "no trigger for checkpoint 0 in the checkpoints command's lines" : WAIT;
+            array<string>@ parts = line.substr(at + 8).split(" ");
+            if (parts.length() < 3)
+                return "can't read the trigger in: " + line;
+            d1 = parseFloat(parts[0]);
+            d2 = parseFloat(parts[1]);
+            d3 = parseFloat(parts[2]);
+            id1 = Race::Respawns();
+            id2 = Race::Falls();
+            Console::Run("teleport " + d1 + " " + d2 + " " + d3);
+            step = 2;
+            t0 = Host::Time();
+            return WAIT;
+        }
+        if (step == 2)
+        {
+            if (Race::CurrentCheckpoint() != 0)
+                return Elapsed() > 4 ? "Race::CurrentCheckpoint " + Race::CurrentCheckpoint() + " with the ball in checkpoint 0's trigger" : WAIT;
+            Console::Run("post 82 200");
+            step = 3;
+            t0 = Host::Time();
+            return WAIT;
+        }
+        if (step == 3)
+        {
+            if (Race::Respawns() != id1 + 1)
+                return Elapsed() > 5 ? "Race::Respawns " + Race::Respawns() + " after R at checkpoint 0, want " + (id1 + 1) : WAIT;
+            Console::Run("teleport " + (d1 + 30000) + " " + d2 + " " + d3);
+            step = 4;
+            t0 = Host::Time();
+            return WAIT;
+        }
+        if (Race::Falls() != id2 + 1)
+            return Elapsed() > 10 ? "Race::Falls " + Race::Falls() + " after a fall, want " + (id2 + 1) : WAIT;
+        if (Elapsed() < 4)
+            return WAIT;                        // the respawn comes a moment after the fall
+        array<string> c = {Is(Race::Respawns() == id1 + 1, "Race::Respawns " + Race::Respawns() + " after a fall, want it unchanged at " + (id1 + 1)),
+                           Is(Race::CurrentCheckpoint() == 0, "Race::CurrentCheckpoint " + Race::CurrentCheckpoint() + " after the fall's respawn, want 0")};
+        return All(c);
+    }, 45);
     Add("race", "Race save and load the ball", "Race::SaveBall,Race::LoadBall", function() {
         if (step == 0 && (!Race::IsActive() || Race::RunId() < 0))
             return WAIT;                            // the restarted run begins
@@ -1653,6 +1719,11 @@ void RegisterWorkshop()
         array<string> c = {Is(Race::IsCustomTrack(), "Race::IsCustomTrack false"), Is(Race::TrackKey().findFirst("custom:") == 0, "Race::TrackKey '" + Race::TrackKey() + "'"),
                            Is(Tracks::OpenState() == "open" || Tracks::OpenState() == "idle", "Tracks::OpenState '" + Tracks::OpenState() + "'")};
         return All(c);
+    });
+    Add("workshop", "Race::TrackImage of a workshop track", "Race::TrackImage", function() {
+        // A workshop track's folder has "<track>_<author>.jpg" beside the map (measured).
+        string image = Race::TrackImage();
+        return Is(image.length() > 4 && image.substr(image.length() - 4) == ".jpg", "Race::TrackImage '" + image + "', want the .jpg beside the map");
     });
     Add("workshop", "Ghosts of the track on screen", "Ghosts::Load", function() {
         if (step == 0)

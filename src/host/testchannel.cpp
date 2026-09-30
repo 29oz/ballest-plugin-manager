@@ -23,6 +23,7 @@
 #include "registry.hpp"
 #include "replay.hpp"
 #include "settings.hpp"
+#include "tracks.hpp"
 #include "ui.hpp"
 
 namespace testchannel {
@@ -380,6 +381,28 @@ void Run(const std::string& cmd) {
              }
              Report(editor::Status());
          }},
+        {"openworkshop", [](const Args& a, const std::string& c) {  // openworkshop <published file id>: as the host's Tracks API
+             Report(c + (tracks::OpenWorkshop(std::strtoull(Arg(a, 1).c_str(), nullptr, 10)) ? " -> started" : " -> failed: " + tracks::OpenState()));
+         }},
+        {"teleport", [](const Args& a, const std::string& c) {       // teleport <x> <y> <z>: the ball being played
+             Report(c + (race::MoveBall(std::atof(Arg(a, 1).c_str()), std::atof(Arg(a, 2).c_str()), std::atof(Arg(a, 3).c_str()))
+                             ? " -> ok" : " -> no ball"));
+         }},
+        {"checkpoints", [](const Args&, const std::string&) {      // the map's checkpoints, the current one, the counters
+             Report("checkpoints " + std::to_string(race::CheckpointCount()) + ", current " + std::to_string(race::CurrentCheckpoint()) +
+                    " | restarts " + std::to_string(race::Restarts()) + " respawns " + std::to_string(race::Respawns()) +
+                    " falls " + std::to_string(race::Falls()));
+             for (int i = 0; i < race::CheckpointCount(); ++i) {
+                 double x = 0, y = 0, z = 0;
+                 double tx = 0, ty = 0, tz = 0;
+                 race::CheckpointPosition(i, &x, &y, &z);
+                 const bool trigger = race::CheckpointTrigger(i, &tx, &ty, &tz);
+                 char line[160];
+                 std::snprintf(line, sizeof line, "  %d at %.0f %.0f %.0f, trigger %s%.0f %.0f %.0f", i, x, y, z, trigger ? "" : "(none) ", tx, ty, tz);
+                 Report(line);
+             }
+         }},
+        {"openstate", [](const Args&, const std::string&) { Report("openstate " + tracks::OpenState()); }},
         {"open", [](const Args& a, const std::string& c) { Report(c + (game::OpenLevel(Arg(a, 1)) ? " -> ok" : " -> failed")); }},
         {"functions", [](const Args& a, const std::string&) { Functions(Arg(a, 1)); }},
         {"instances", [](const Args& a, const std::string&) {

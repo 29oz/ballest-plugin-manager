@@ -723,8 +723,13 @@ void RegisterInput() {
 
 std::string RaceTrackKey() { return race::CurrentTrack().key; }
 bool RaceBallPosition(double& x, double& y, double& z) { return race::BallPosition(&x, &y, &z); }
+bool RaceCheckpointPosition(int index, double& x, double& y, double& z) { return race::CheckpointPosition(index, &x, &y, &z); }
 std::string RaceTrackName() { return race::CurrentTrack().name; }
 std::string RaceTrackAuthor() { return race::CurrentTrack().author; }
+std::string RaceTrackImage() {
+    const race::Track& t = race::CurrentTrack();
+    return t.custom ? t.image : t.key.rfind("map:", 0) == 0 ? tracks::Image(t.key.substr(4)) : "";
+}
 double RaceAuthorTime() { return race::CurrentTrack().authorTime; }
 bool RaceCustomTrack() { return race::CurrentTrack().custom; }
 bool RaceInput(double& x, double& y, bool& jump) { return race::Input(&x, &y, &jump); }
@@ -779,11 +784,17 @@ void RegisterRace() {
     Global("bool OnTrack()", asFUNCTION(race::OnTrack));
     Global("bool IsActive()", asFUNCTION(race::Active));
     Global("int Restarts()", asFUNCTION(race::Restarts));
+    Global("int Respawns()", asFUNCTION(race::Respawns));
+    Global("int Falls()", asFUNCTION(race::Falls));
+    Global("int CheckpointCount()", asFUNCTION(race::CheckpointCount));
+    Global("bool CheckpointPosition(int, double &out, double &out, double &out)", asFUNCTION(RaceCheckpointPosition));
+    Global("int CurrentCheckpoint()", asFUNCTION(race::CurrentCheckpoint));
     Global("int RunId()", asFUNCTION(race::RunId));
     Global("bool IsComplete()", asFUNCTION(race::Complete));
     Global("string TrackKey()", asFUNCTION(RaceTrackKey));
     Global("string TrackName()", asFUNCTION(RaceTrackName));
     Global("string TrackAuthor()", asFUNCTION(RaceTrackAuthor));
+    Global("string TrackImage()", asFUNCTION(RaceTrackImage));
     Global("double AuthorTime()", asFUNCTION(RaceAuthorTime));
     Global("bool IsCustomTrack()", asFUNCTION(RaceCustomTrack));
     Global("bool GetInput(double &out, double &out, bool &out)", asFUNCTION(RaceInput));

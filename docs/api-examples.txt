@@ -1171,6 +1171,47 @@ if (now > seenRestarts)
     restarts += now - seenRestarts;
 seenRestarts = now;
 
+== Race::Respawns
+Respawns at a checkpoint since the game started: R once a checkpoint has been cleared. Falls don't count (see
+`Falls`), and neither does R before the first checkpoint (that's a restart). It comes from the game's own fault
+counter, so rebinding keys changes nothing. Read `CurrentCheckpoint()` in the same frame to know which one.
+--
+// Count R respawns at each checkpoint
+int now = Race::Respawns();
+if (now > seenRespawns)
+    respawnsAt[Race::CurrentCheckpoint() + 1] += now - seenRespawns;
+seenRespawns = now;
+
+== Race::Falls
+Falls into a kill zone since the game started. After a checkpoint the ball respawns there; before the first one it
+goes back to the start, and that isn't counted as a restart either.
+--
+int now = Race::Falls();
+if (now > seenFalls)
+    Log::Info("fell " + (now - seenFalls) + " time(s)");
+seenFalls = now;
+
+== Race::CheckpointCount
+How many checkpoints (strips and discs) the track on screen has; 0 off a track. Many of the game's own tracks have
+none: there R always restarts from the beginning.
+--
+Log::Info(Race::TrackName() + " has " + Race::CheckpointCount() + " checkpoints");
+
+== Race::CheckpointPosition
+Where a checkpoint is (0 to CheckpointCount - 1). They are ordered by position, so the same checkpoint has the same
+index and position every time the track is played: use the position to recognise one across sessions.
+--
+double x, y, z;
+if (Race::CheckpointPosition(0, x, y, z))
+    Log::Info("checkpoint 0 at " + int(x) + ", " + int(y) + ", " + int(z));
+
+== Race::CurrentCheckpoint
+The checkpoint a respawn would go to (the last one touched), or -1 before any this run. A restart from the beginning
+sets it back to -1.
+--
+int cp = Race::CurrentCheckpoint();
+cpText.text = cp < 0 ? "start" : "checkpoint " + (cp + 1);
+
 == Race::RunId
 The run the player is on: a new number for every new run (a restart), the same through checkpoint respawns; -1 off a
 track. The ball also gets a new one when a race starts after the pre-race screen, so count while `IsActive()`.
@@ -1204,6 +1245,14 @@ nameText.text = Race::TrackName();
 Who made the track, as the header shows it; "" on the game's own tracks.
 --
 authorText.text = Race::TrackAuthor() == "" ? "" : "by " + Race::TrackAuthor();
+
+== Race::TrackImage
+The track's preview picture, for `Window.AddImage`: for the game's own tracks the same as `Tracks::Image`, for a
+workshop track the .jpg that came with it, for a local map the one it got when it was published; `""` if there's none.
+--
+string image = Race::TrackImage();
+if (image != "")
+    window.AddImage(image, 160, 90);
 
 == Race::AuthorTime
 The track's author time in seconds, from the medal row; 0 until the race has started.

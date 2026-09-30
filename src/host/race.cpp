@@ -1,5 +1,8 @@
 #include "race.hpp"
 
+#include <windows.h>
+
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -9,6 +12,7 @@
 
 #include "engine.hpp"
 #include "game.hpp"
+#include "layout.hpp"
 #include "log.hpp"
 #include "widgets.hpp"
 
@@ -137,6 +141,13 @@ void ReadTrack() {
         if (const size_t amp = file.find('&'); amp != std::string::npos) file = file.substr(amp + 1);
         if (const size_t dot = file.rfind('.'); dot != std::string::npos) file = file.substr(0, dot);
         t.key = file.empty() ? "" : "custom:" + id + ":" + file;
+        // The picture the game keeps beside the map ("<track>_<author>.jpg", measured in workshop folders; a local map
+        // has one once it has been published).
+        t.image = "";
+        if (slash != std::string::npos && !file.empty()) {
+            const std::string jpg = path.substr(0, slash + 1) + file + ".jpg";
+            if (GetFileAttributesW(eng::Widen(jpg).c_str()) != INVALID_FILE_ATTRIBUTES) t.image = jpg;
+        }
     } else {
         t.key = "map:" + worldName;
     }
@@ -280,9 +291,110 @@ void ReleasePractice(const std::string& why) {
     hostlog::Info("race: practice off (" + why + ")");
 }
 
+// --- checkpoint respawns and falls ----------------------------------------------------------------------------------
+// Read from the game's Blueprints (BP_MyPlayerController, MP_ActualCheckpoint_Strip, BP_KillZone):
+//   * a respawn at a checkpoint (R once a checkpoint is cleared, or a fall after one) runs the controller's
+//     EventResetBall with bRespawnOnly, the one caller of IncrementPlayerFaults: ActualRaceFaults (a double) goes up
+//     by one. Before the first checkpoint both go back to the start instead, and the faults don't move.
+//   * a fall is the kill zone calling the native BallestRestartBlueprintLibrary.BeginKillzoneRestart, which respawns
+//     the ball a moment later (its delay is 1 s). That function's entry is wrapped (as the cosmetics wrap theirs) to
+//     tell falls from R.
+//   * the checkpoint a respawn goes to is the one whose bCurrent is on: a strip (or disc) the ball touches moves the
+//     level's player start to its arrow and turns itself current and every other one off. Strips start out current
+//     before any is touched (measured), so it has to be activated (bActivated) as well.
+int gRespawns = 0, gFalls = 0;
+eng::Weak gFaultsController;
+double gLastFaults = 0;
+double gFallAt = -100;                      // game::Seconds() of the last fall
+bool gFallRespawnOpen = false;              // that fall's respawn and restart not yet seen (a fall before the first
+bool gFallRestartOpen = false;              // checkpoint moves both the faults and the restart counter, measured)
+constexpr double kFallToRespawn = 4;        // seconds: the game's delay is 1 s
+
+using NativeFunction = void (*)(Obj context, uint8_t* frame, void* result);
+NativeFunction gKillzoneOriginal = nullptr;
+
+// Runs inside the game's own call: counts, then lets the game go on as usual.
+void HookedKillzone(Obj context, uint8_t* frame, void* result) {
+    ++gFalls;
+    gFallAt = game::Seconds();
+    gFallRespawnOpen = gFallRestartOpen = true;
+    gKillzoneOriginal(context, frame, result);
+}
+
+void WatchKillzone() {
+    static bool done = false;
+    if (done) return;
+    Obj fn = eng::FindFunction(eng::FindClass("BallestRestartBlueprintLibrary"), "BeginKillzoneRestart");
+    if (!fn) return;                        // not loaded yet: tried again next frame
+    done = true;
+    NativeFunction entry = nullptr;
+    std::memcpy(&entry, fn + layout::kUFunctionNativeFunctionOffset, sizeof entry);
+    if (!entry || !eng::InImage(reinterpret_cast<void*>(entry))) {
+        hostlog::Warn("race: BeginKillzoneRestart is not as measured; falls are not counted");
+        return;
+    }
+    gKillzoneOriginal = entry;
+    NativeFunction hooked = &HookedKillzone;
+    std::memcpy(fn + layout::kUFunctionNativeFunctionOffset, &hooked, sizeof hooked);
+    hostlog::Info("race: counting falls");
+}
+
+void CountRespawns(Obj controller) {
+    double faults = 0;
+    if (!eng::FindProp(eng::ClassOf(controller), "ActualRaceFaults") ||
+        !eng::ReadBytes(controller, "ActualRaceFaults", &faults, sizeof faults))
+        return;
+    // Only during a race: loading a map moves the faults too (measured on Chaos2), without any respawn.
+    if (eng::Get(gFaultsController) == controller && faults > gLastFaults && gActive) {
+        const int added = static_cast<int>(std::lround(faults - gLastFaults));
+        const bool fall = gFallRespawnOpen && game::Seconds() - gFallAt < kFallToRespawn;
+        if (fall) gFallRespawnOpen = false; // this respawn was the fall's
+        else gRespawns += added;
+        hostlog::Info(std::string("race: respawned at a checkpoint (") + (fall ? "fall" : "R") + ", " +
+                      std::to_string(gRespawns) + " R and " + std::to_string(gFalls) + " falls this session)");
+    }
+    gFaultsController = eng::MakeWeak(controller);
+    gLastFaults = faults;                   // a new controller, or a new run's reset: a new baseline
+}
+
+struct CheckpointActor {
+    eng::Weak actor;
+    Vec3 at;
+};
+std::vector<CheckpointActor> gCheckpoints;
+int gCheckpointGeneration = -1;
+double gNextCheckpointScan = 0;
+
+// Every checkpoint of the map on screen (BP_ActualCheckpointBase_C: strips and discs), in order of position so the
+// order is the same every time the map is played. Scanned again every few seconds while on a track (the editor can
+// add and remove them) and whenever one has gone.
+void ScanCheckpoints(Obj controller) {
+    bool gone = false;
+    for (const auto& c : gCheckpoints) gone |= !eng::Get(c.actor);
+    if (gCheckpointGeneration == game::Generation() && !gone && game::Seconds() < gNextCheckpointScan) return;
+    gCheckpointGeneration = game::Generation();
+    gNextCheckpointScan = game::Seconds() + 5;
+    gCheckpoints.clear();
+    static Obj cls = nullptr;
+    if (!cls) cls = eng::FindClass("BP_ActualCheckpointBase_C");
+    if (!cls) return;
+    Obj level = eng::OuterOf(controller);
+    eng::ForEachObject([&](Obj o) {
+        if (eng::IsA(o, cls) && !eng::IsDefaultObject(o) && eng::OuterOf(o) == level)
+            gCheckpoints.push_back({eng::MakeWeak(o), eng::Call(o, "K2_GetActorLocation").ReturnAs<Vec3>()});
+        return true;
+    });
+    std::sort(gCheckpoints.begin(), gCheckpoints.end(), [](const CheckpointActor& a, const CheckpointActor& b) {
+        if (a.at.x != b.at.x) return a.at.x < b.at.x;
+        if (a.at.y != b.at.y) return a.at.y < b.at.y;
+        return a.at.z < b.at.z;
+    });
+}
+
 }  // namespace
 
 void Frame() {
+    WatchKillzone();
     Obj controller = game::PlayerController();
     gOnTrack = controller && eng::FindProp(eng::ClassOf(controller), "bRaceActive");
     gActive = gComplete = false;
@@ -301,9 +413,12 @@ void Frame() {
     }
     if (!gOnTrack) {
         gRunId = -1;
+        gCheckpoints.clear();
         return;
     }
+    ScanCheckpoints(controller);
     eng::ReadBool(controller, "bRaceActive", &gActive);
+    CountRespawns(controller);
     eng::ReadBool(controller, "bRaceComplete", &gComplete);
     if (!gTrackDone && game::Seconds() >= gNextTrackRead) {
         gNextTrackRead = game::Seconds() + 1;
@@ -334,8 +449,15 @@ void Frame() {
     int32_t counter = 0;
     if (!ReadCounter(pawn, &counter)) return;
     if (eng::Get(gBall) == pawn && counter > gLastCounter) {
-        gRestarts += counter - gLastCounter;
-        hostlog::Info("race restarted from the beginning (" + std::to_string(gRestarts) + " this session)");
+        // A fall before the first checkpoint goes back to the start and raises the ball's counter too (measured on
+        // Chaos2); it's a fall, not a restart.
+        if (gFallRestartOpen && game::Seconds() - gFallAt < kFallToRespawn) {
+            gFallRestartOpen = false;
+            hostlog::Info("race: back to the start after a fall (not counted as a restart)");
+        } else {
+            gRestarts += counter - gLastCounter;
+            hostlog::Info("race restarted from the beginning (" + std::to_string(gRestarts) + " this session)");
+        }
     }
     gBall = eng::MakeWeak(pawn);
     gLastCounter = counter;
@@ -344,6 +466,48 @@ void Frame() {
 bool OnTrack() { return gOnTrack; }
 bool Active() { return gActive; }
 int Restarts() { return gRestarts; }
+int Respawns() { return gRespawns; }
+int Falls() { return gFalls; }
+int CheckpointCount() { return gOnTrack ? static_cast<int>(gCheckpoints.size()) : 0; }
+
+bool CheckpointPosition(int index, double* x, double* y, double* z) {
+    if (index < 0 || index >= CheckpointCount()) return false;
+    *x = gCheckpoints[index].at.x;
+    *y = gCheckpoints[index].at.y;
+    *z = gCheckpoints[index].at.z;
+    return true;
+}
+
+int CurrentCheckpoint() {
+    for (int i = 0; i < CheckpointCount(); ++i) {
+        bool current = false, activated = false;         // strips start out current (measured): only touched ones count
+        if (Obj o = eng::Get(gCheckpoints[i].actor))
+            if (eng::ReadBool(o, "bCurrent", &current) && current && eng::ReadBool(o, "bActivated", &activated) && activated)
+                return i;
+    }
+    return -1;
+}
+
+bool CheckpointTrigger(int index, double* x, double* y, double* z) {
+    Obj o = index >= 0 && index < CheckpointCount() ? eng::Get(gCheckpoints[index].actor) : nullptr;
+    Obj aura = o ? eng::ReadObj(o, "PreCheckpointAura1") : nullptr;     // what the ball touches (MP_ActualCheckpoint_Strip)
+    if (!aura) return false;
+    const Vec3 at = eng::Call(aura, "K2_GetComponentLocation").ReturnAs<Vec3>();
+    *x = at.x;
+    *y = at.y;
+    *z = at.z;
+    return true;
+}
+
+bool MoveBall(double x, double y, double z) {
+    Obj ball = PlayedBall();
+    if (!ball) return false;
+    eng::Params p(eng::FunctionOn(ball, "K2_SetActorLocation"));
+    p.Set("NewLocation", Vec3{x, y, z});
+    p.Set("bSweep", uint8_t{0});
+    p.Set("bTeleport", uint8_t{1});
+    return eng::Invoke(ball, p);
+}
 
 bool BallPosition(double* x, double* y, double* z) {
     Obj ball = PlayedBall();
