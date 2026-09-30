@@ -921,6 +921,9 @@ Built Build(const Model& model, Obj parent) {
             if (materials[i]) eng::Call(component, "SetMaterial", static_cast<int32_t>(i), materials[i]);
         eng::Call(component, "SetTranslucentSortPriority", kGlassSortPriority);   // glass after the water
         eng::Call(component, "SetCollisionEnabled", uint8_t{0});     // never touches the ball's physics
+        // As the game's own ball (its Sphere has bReceivesDecals false): the start pad's shadow decal would otherwise
+        // paint the model's lower half black (measured on the start pad and the menu stand).
+        eng::Call(component, "SetReceivesDecals", uint8_t{0});
         const uint8_t snap = 2;                                       // EAttachmentRule::SnapToTarget
         Obj on = parent;                                              // the ball, or the group it is built on
         if (group.parent >= 0) {
@@ -948,6 +951,7 @@ Built Build(const Model& model, Obj parent) {
                         if (materials[i]) eng::Call(frameComponent, "SetMaterial", static_cast<int32_t>(i), materials[i]);
                     eng::Call(frameComponent, "SetTranslucentSortPriority", kGlassSortPriority);
                     eng::Call(frameComponent, "SetCollisionEnabled", uint8_t{0});
+                    eng::Call(frameComponent, "SetReceivesDecals", uint8_t{0});
                     eng::Call(frameActor, "K2_AttachToComponent", component, std::array<uint8_t, 8>{}, snap, snap, snap, uint8_t{0});
                     eng::Call(frameComponent, "SetVisibility", uint8_t{0}, uint8_t{0});
                     flip.frames.push_back(eng::MakeWeak(frameActor));
