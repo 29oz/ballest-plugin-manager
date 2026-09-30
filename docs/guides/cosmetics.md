@@ -179,7 +179,8 @@ names of those that are).
 
 Extras are new kinds of cosmetics, each in a slot of its own, worn with the ball and hat (host 0.19.0 and newer). The
 first is **arms**, added through [Cosmetic Kit Plus](https://github.com/AnythingGoes-ballest/ballest-cosmetic-kit-plus).
-Each slot gets a section of its own on the Customize page's **hats** tab in local mode, with a **none** tile first.
+Each slot gets a tab of its own on the Customize page, after balls, hats and bfx (shown in local mode), with a
+**none** tile first.
 
 An extra is a model, built on the ball like a ball's model: the ball's middle is the origin, its radius is 50, +x is
 forward and +y the ball's right. Put it in a `travel` group so it stays upright and faces where the ball goes, and give

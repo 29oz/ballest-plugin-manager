@@ -1822,8 +1822,8 @@ Storage::Set("ball", Cosmetics::Equipped(Cosmetics::Ball));
 Adds an extra: another kind of cosmetic in a slot of its own (`"arms"`; lowercase letters, digits, dashes and spaces),
 worn on the player's own balls with their ball and hat, like a custom one (local only). It is a model file in the
 [models format](../guides/cosmetics.md#models) or a 3D model file, built on the ball like a ball's model: put it in a
-`travel` group to keep it upright and facing where the ball goes. Each slot gets a section of its own on the Customize
-page's hats tab in local mode, with a "none" tile first. The arguments are the slot, an id, the name on its tile, its
+`travel` group to keep it upright and facing where the ball goes. Each slot gets a tab of its own on the Customize
+page, after balls, hats and bfx (shown in local mode), with a "none" tile first. The arguments are the slot, an id, the name on its tile, its
 tile picture and the model. False (and a log line saying why) if it can't be made. Requires host 0.19.0.
 --
 string f = Plugins::Folder();
