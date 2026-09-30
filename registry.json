@@ -200,6 +200,28 @@
       }
     },
     {
+      "id": "rainbow-ball",
+      "name": "Rainbow Ball",
+      "description": "A rainbow ball whose rainbow keeps moving round it as it rolls.",
+      "author": "AnythingGoes",
+      "repo": "AnythingGoes-ballest/ballest-rainbow-ball",
+      "version": "0.1.0",
+      "commit": "5b8f85535657a02a432ca11f99f61d9ca2c16185",
+      "min_host": "0.17.1",
+      "icon": "icon.png",
+      "dependencies": [
+        "cosmetic-kit"
+      ],
+      "files": {
+        "info.toml": "d1059ee84962fa51f59f2706ccf9cace6b665590c96a62afed2badd3118e3451",
+        "main.as": "d859e8067dc2e7e8bda285b742d9f7dcd4b15eb24950e231f8d2d2580418539c",
+        "icon.png": "cf6faf7c021eb870643b0ea5584f39a41ad127cba84bdd75df98d38349eec796",
+        "preview.png": "cf6faf7c021eb870643b0ea5584f39a41ad127cba84bdd75df98d38349eec796",
+        "models/rainbow.txt": "c364c5eb371ee52c9050180d48136d7cf174b40fe13a25e3ed56393d86ec89b5",
+        "models/rainbow.glb": "3294de31c0a6ce5e3f588870d0f60f8e2696d02149ef87185580e79edf11bf1a"
+      }
+    },
+    {
       "id": "replay-manager",
       "name": "Replay Manager",
       "description": "Pause, speed (.1x to 5x), scrubbing, default / follow 3D / free cameras, camera distance, and seeing through objects.",
@@ -215,14 +237,53 @@
         "main.as": "b338ca8886429c555292c021a97d8fb8b5b28947b60b00f15cb283756e40c3c7",
         "icon.png": "93ff162118c1ede8d14cbd2bc333f7a25823f14f7c6c5732e654059d4460acfe"
       }
+    },
+    {
+      "id": "two-tone-balls",
+      "name": "Two-Tone Balls",
+      "description": "Ten two-tone balls: clear glass with the lower half in colour (red, orange, yellow, lime, green, teal, blue, purple, pink, black).",
+      "author": "AnythingGoes",
+      "repo": "AnythingGoes-ballest/ballest-two-tone-balls",
+      "version": "0.1.0",
+      "commit": "eeb15f384975f7524e44cf88a56782047dbb7a79",
+      "min_host": "0.14.0",
+      "icon": "icon.png",
+      "dependencies": [
+        "cosmetic-kit"
+      ],
+      "files": {
+        "info.toml": "e07ff2ce02fee97e20e25997b7a9abcf32af290a84d0dad29578687fa411ad4b",
+        "main.as": "87a538503491ea94b2067b64b9fad12ef98d44cd989adb6a8057ce829a67e18a",
+        "previews/black.png": "80ffc6f87f244c571cafa8ad0dd3a059d34b2caf7de82b7ec521c476dd282be8",
+        "previews/blue.png": "e6e98ab5168fd382f59811bcce72190bbf53b6b780abae68cda1f79e63d3a866",
+        "previews/green.png": "b0a762b8e8d646ee706eb17de69bbc49bf42bcd6607e2a499a940fcc1ecab4fa",
+        "previews/lime.png": "51d08b8a96e326e6589d5448f80574a954ef9d9e2fcc8c576a80282ebc6d220b",
+        "previews/orange.png": "81272d4ff1d764f9d61ecb8c0c5fb7e09548e32ab5744abdbb3bf2b26634a6ab",
+        "previews/pink.png": "a42889840ed0901bbd619a92ce9309faf971dcd37ce23371838c671ac1df95bf",
+        "previews/purple.png": "eb6a6334bd6a26e59a65fd9127e3e872ecd6278da9785d6e76bfa5c50d559ee3",
+        "previews/red.png": "123b1c0b12093182d57c02602f0d2940ba6a053b0ece1ae8dd17dce919d0db59",
+        "previews/teal.png": "fa18ed52b57fd27540e7b5560603290c787e9a5bafb70e0b1b4d306a66dad644",
+        "previews/yellow.png": "54aa45c4d79d7799fb6148d279f4b4a7dc61bc8d8e33ad82a721d9469ef3d732",
+        "models/black.txt": "4161b92d43654cbfae1c580c57658e9fc5055b369ca298dbf55cff74711c6940",
+        "models/blue.txt": "dd857985030ac55a4f4e5df6066f5fa7e58659bd3bbb065a80663e7df1675645",
+        "models/green.txt": "350cfc14bd22aa9c2ef6112e21b09fbb55a461616ae9797b7438b53120b0f6ee",
+        "models/lime.txt": "7fdbb4730d0425d2f47572b526b65c4ebdc975bea3318f002d0b526cd24f2c37",
+        "models/orange.txt": "f12e0f665fc543d5ec31d60102deee998f49fbc13bcc98a78e238ce9011a4e1b",
+        "models/pink.txt": "f3c3f079d8b823989234f6ab765e99ef54aa324574db67edfb3e0f10c146116d",
+        "models/purple.txt": "b6869e85e0706a3b2771dcaa14bf4a59cf61a6f39ec91dc701d7b4b7ac905a57",
+        "models/red.txt": "03d5f92bd7baf7a3df6c10b7b0f41c7efdefd5af1904efa8dd6dff837b518283",
+        "models/teal.txt": "924989a3034b5ecc7b04b56aec346109e698794dd519b1fa569d6ba75b0f40fe",
+        "models/yellow.txt": "585b8d95af59eda238180dc178f9cfdbc057a285dab9bc3f37464899cd3efc9d",
+        "icon.png": "fa18ed52b57fd27540e7b5560603290c787e9a5bafb70e0b1b4d306a66dad644"
+      }
     }
   ],
   "host": {
-    "version": "0.17.0",
+    "version": "0.17.1",
     "repo": "AnythingGoes-ballest/ballest-plugin-manager",
-    "commit": "e9246b570fcab8ccb9cc894b7d3aae6f728114ca",
-    "dll": "https://github.com/AnythingGoes-ballest/ballest-plugin-manager/releases/download/v0.17.0/version.dll",
-    "dll_sha256": "885bc709230aaa422c7855fd7e27c22a9e6f26453fd5f1497dba2059c9a0c4ad",
+    "commit": "0066cc8bbdabf3504ff60ebe6c582e8b4a6cb17e",
+    "dll": "https://github.com/AnythingGoes-ballest/ballest-plugin-manager/releases/download/v0.17.1/version.dll",
+    "dll_sha256": "5edfbe0e104df7380bac38406a07c22ed40a54e0427c87a3972bb8ed7fa4dc91",
     "files": {
       "plugins/hello-world/info.toml": "5300e78277bc1e92d4d1626ce17ed15e938f37e692b2271b58c3c9c30b79be40",
       "plugins/hello-world/main.as": "24f510821cb3ea7825bfef6363d92e12fd493b9977038beb9e6c297a692fb23b",
