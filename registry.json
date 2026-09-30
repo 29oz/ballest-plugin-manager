@@ -43,6 +43,25 @@
       }
     },
     {
+      "id": "cosmetic-kit-plus",
+      "name": "Cosmetic Kit Plus",
+      "description": "Adds new kinds of cosmetics on top of Cosmetic Kit, starting with arms: plugins add them, you pick them on the Customize page, and it remembers what you wear.",
+      "author": "AnythingGoes",
+      "repo": "AnythingGoes-ballest/ballest-cosmetic-kit-plus",
+      "version": "0.1.0",
+      "commit": "e6462ea13c0cabf454a48e6a54abca621461e0af",
+      "min_host": "0.19.0",
+      "icon": "icon.png",
+      "dependencies": [
+        "cosmetic-kit"
+      ],
+      "files": {
+        "info.toml": "962e795599b92c1b25590413b25091939336b0627e7bb0919ca498e7e6cef246",
+        "main.as": "418a73fee4d1b2a767ee3fb0dcadd1769d24a47e487f435f1dc764c9438609a5",
+        "icon.png": "aed97968566238f753b7f5c7a5f51591f0b7ea42763d577b11ef7dcf029d370d"
+      }
+    },
+    {
       "id": "create-extensions",
       "name": "Create Extensions",
       "description": "Track editor extras: drag to select, groups (G / U), rotate modes in the toolbar (center, mirrored), Shift/Ctrl+click to deselect, whole-unit placement, placement distance, rotated copies, Tab between transform boxes.",
@@ -59,6 +78,43 @@
         "keyboard_g.png": "beaedfc27e44bc1748d8e8d76b7b9f2e6444a323b7a1860a7ae6e727dbe995d0",
         "keyboard_u.png": "a9c0359e7d3764483af43e68584262ed432912e163404bdd3fff78c73b8b380d",
         "icon.png": "673495590b04fbc8b8a75af30e0eed74dc9b34ef11584f3e66fea362e53b74fe"
+      }
+    },
+    {
+      "id": "example-arms",
+      "name": "Example Arms",
+      "description": "Six arms for your ball, moving as it rolls: buff arms, zombie arms, skeleton arms, robot arms, crab claws and boxer arms.",
+      "author": "AnythingGoes",
+      "repo": "AnythingGoes-ballest/ballest-example-arms",
+      "version": "0.1.0",
+      "commit": "4efd1e0f71cccd76857b25ec1fa2b5e2a9870c82",
+      "min_host": "0.19.0",
+      "icon": "icon.png",
+      "dependencies": [
+        "cosmetic-kit-plus"
+      ],
+      "files": {
+        "info.toml": "b74bc9001661ef5a8e51cabedd8bbb9c0a5d6c5df03815e0e4b2d9120f83c509",
+        "main.as": "ff559fd2c935aa107f8581c8e924e885aab587125de6091f5af52fcaeb86ac4d",
+        "previews/boxer.png": "9f9bee9b6f0811fe1dec1b924cd6b2c0b0623a6cf4b7ed361d719ca77381da20",
+        "previews/buff.png": "cfc9eb0f37a30ee4532c31b98c6e14a422d8e1e48330ee164c97f049cdcd0e7f",
+        "previews/crab.png": "42c0f721afcb2ea0276a41a4137b6521ced90c639ce8f3356507832457635909",
+        "previews/robot.png": "f85bee1360fcf8b7e9996c96eab9a5a4fa4001e58de7aa28c9aaaab20b5081a9",
+        "previews/skeleton.png": "b4057d113c0b5753f1c788d3751516cbec8daef9b0f6da1a42a06d9ae0582aa4",
+        "previews/zombie.png": "4005a9c6c776a3a90f8b277bf9f26e901b14f2841eed9d3422aaf2e125f65325",
+        "models/boxer_arms.txt": "9276c96e0b23633787744779f3395049ac90ba6efa0763cfe77e53ef47970ecf",
+        "models/buff_arms.txt": "7f6ee60700bddc944c8637d4edc969c5fb0816f66e757661bf00fa10c270e28c",
+        "models/crab_arms.txt": "e93999c84d57f0e61593dc65b5ba38198831c1a27d333bfd88cb47055cdd1e96",
+        "models/robot_arms.txt": "a70ba3f2fd15da8f11404b0d9321f3a6df66ac64cab3b2999657d9c0315f98d5",
+        "models/skeleton_arms.txt": "49a2bc9e059ef1c58595d996c81492580f6bfa662294265c259570cc1ce924bb",
+        "models/zombie_arms.txt": "be3f37e0a551ec45482b5fa9a04d8782bd0d35f41068e15eb37fef951c6337fb",
+        "models/robot_l.glb": "1c00395769d4ed1af91d1d2b05c7613c8dab0742953d598a42136768d071952f",
+        "models/robot_r.glb": "9327d470f6b37a96ccba38aa308845a2fb2ef5464fe772f7f7f406f5fa8fcb18",
+        "models/skeleton_l.glb": "5573ccc79f6a998d4f67da2c299418614abb6f43119f61e83199fbe508d06b0e",
+        "models/skeleton_r.glb": "a347d8110fffd154011174ed4b9b648366c5c35028ad3341263b14e88b3a83ac",
+        "models/zombie_l.glb": "49f31286e7f5fe5315174940e6158af3c6ec30660ec25d36e44fdde9bbb9d20b",
+        "models/zombie_r.glb": "9c84f0aeb6fe87bbda882a094061f5ecc6baa942010ab25a59ea70c2dd371247",
+        "icon.png": "cfc9eb0f37a30ee4532c31b98c6e14a422d8e1e48330ee164c97f049cdcd0e7f"
       }
     },
     {
@@ -389,11 +445,11 @@
     }
   ],
   "host": {
-    "version": "0.18.0",
+    "version": "0.19.0",
     "repo": "AnythingGoes-ballest/ballest-plugin-manager",
-    "commit": "38b2b561dbd62afb50ea3fa9cdc9783e693502b2",
-    "dll": "https://github.com/AnythingGoes-ballest/ballest-plugin-manager/releases/download/v0.18.0/version.dll",
-    "dll_sha256": "2841f8dbabdd68f4b30cf851473326eafedc4214dc53bbd40197b6c2dcc0e92b",
+    "commit": "35d94447c35e2fb2213535c1be74e63575b0565f",
+    "dll": "https://github.com/AnythingGoes-ballest/ballest-plugin-manager/releases/download/v0.19.0/version.dll",
+    "dll_sha256": "64bdb36a06cb7ef2ee9b75468967eb247dd5577e0e3ff2f41795932f5d0fe602",
     "files": {
       "plugins/hello-world/info.toml": "5300e78277bc1e92d4d1626ce17ed15e938f37e692b2271b58c3c9c30b79be40",
       "plugins/hello-world/main.as": "24f510821cb3ea7825bfef6363d92e12fd493b9977038beb9e6c297a692fb23b",
