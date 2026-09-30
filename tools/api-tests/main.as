@@ -1091,6 +1091,9 @@ void RegisterCustomize()
     Add("customize", "Cosmetics equip", "Cosmetics::Equip,Cosmetics::Equipped", function() {
         if (step == 0)
         {
+            // The page opens in public mode, where the menu ball shows the game's own choice (host 0.17.0 on); custom
+            // cosmetics show on it in local mode.
+            Console::Run("cosmode local");
             wornBall = Cosmetics::Equipped(Cosmetics::Ball);
             wornHat = Cosmetics::Equipped(Cosmetics::Hat);
             wornBfx = Cosmetics::Equipped(Cosmetics::Bfx);
@@ -1117,6 +1120,7 @@ void RegisterCustomize()
         Cosmetics::Equip(Cosmetics::Ball, wornBall);            // back to what the player wore
         Cosmetics::Equip(Cosmetics::Hat, wornHat);
         Cosmetics::Equip(Cosmetics::Bfx, wornBfx);
+        Console::Run("cosmode public");
         return Is(hat, "Cosmetics::Equipped(Hat) '" + Cosmetics::Equipped(Cosmetics::Hat) + "'");
     }, 20);
     Add("customize", "Cosmetics preview ball", "Cosmetics::PreviewBall", function() {
