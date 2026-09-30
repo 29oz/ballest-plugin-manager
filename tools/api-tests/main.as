@@ -1513,6 +1513,8 @@ void RegisterTrack()
                            Is(Draw::Scale(model, 0.5), "Draw::Scale false"), Is(Draw::Effect(wave, x, y, z - 47, 0.5), "Draw::Effect false"),
                            Is(!Draw::Effect("/Game/NoSuchEffect.NoSuchEffect", x, y, z), "Draw::Effect of a missing system true"),
                            Is(Draw::Sound("/Game/Sound/Gameplay/SFX_SoftPop.SFX_SoftPop", 0.3), "Draw::Sound false"),
+                           Is(Draw::Sound(Plugins::Folder() + "beep.wav", 0.3), "Draw::Sound of the plugin's beep.wav false"),
+                           Is(!Draw::Sound(Plugins::Folder() + "missing.wav"), "Draw::Sound of a missing .wav true"),
                            Is(Camera::Shake(0.2), "Camera::Shake false")};
         Draw::Remove(model);
         c.insertLast(Is(!Draw::Turn(model, 0, 0, 0), "Draw::Remove: Draw::Turn after it answered true"));

@@ -2223,10 +2223,12 @@ only loads its own packaged content. Requires host 0.20.0.
 Draw::Effect("/Game/Art/NS_BallExplosion.NS_BallExplosion", x, y, z, 0.5);
 
 == Draw::Sound
-Plays one of the game's sounds once, by its object path, not placed in the world. False if there's no such sound.
-Requires host 0.20.0.
+Plays a sound once, not placed in the world: one of the game's, by its object path, or the plugin's own `.wav` file
+(16-bit PCM, mono or stereo, any rate), by its full path. False if there's no such sound; a file that can't be played
+says why in the log. Requires host 0.20.0.
 --
 Draw::Sound("/Game/Sound/Gameplay/SFX_SoftPop.SFX_SoftPop", 0.5, 1.2);
+Draw::Sound(Plugins::Folder() + "sounds/boing.wav");
 
 == Draw::Show
 Shows or hides a shape.

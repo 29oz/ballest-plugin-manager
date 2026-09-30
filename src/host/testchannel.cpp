@@ -13,6 +13,7 @@
 
 #include "cosmetics.hpp"
 #include "engine.hpp"
+#include "draw.hpp"
 #include "game.hpp"
 #include "hud.hpp"
 #include "race.hpp"
@@ -387,6 +388,12 @@ void Run(const std::string& cmd) {
         {"teleport", [](const Args& a, const std::string& c) {       // teleport <x> <y> <z>: the ball being played
              Report(c + (race::MoveBall(std::atof(Arg(a, 1).c_str()), std::atof(Arg(a, 2).c_str()), std::atof(Arg(a, 3).c_str()))
                              ? " -> ok" : " -> no ball"));
+         }},
+        {"playsound", [](const Args&, const std::string& c) {      // playsound <file.wav or game sound path>: Draw::Sound
+             Report(c + (draw::Sound(c.size() > 10 ? c.substr(10) : "", 1, 1) ? " -> ok" : " -> failed"));
+         }},
+        {"soundstate", [](const Args&, const std::string& c) {     // soundstate: whether the last custom sound is playing
+             Report(c + " -> " + draw::LastSoundState());
          }},
         {"fling", [](const Args& a, const std::string& c) {        // fling <vx> <vy> <vz>: the ball's velocity (cm/s), as a hit gives it
              eng::Obj pawn = eng::Call(game::PlayerController(), "K2_GetPawn").ReturnObj();

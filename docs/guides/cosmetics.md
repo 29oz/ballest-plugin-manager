@@ -201,8 +201,9 @@ capsule skin r=5 len=20 at=0,54,5 rot=180,0,0
 The second is **bounce**: an effect when the ball lands or hits a wall (host 0.20.0 and newer). A bounce tile has no
 model; the plugin that adds it plays the effect while it's worn. Each frame it reads the bounces with
 [Race::NextBounce](../reference/api/race.md) (where, which way the surface faces, and how hard, from 0 to 1) and plays
-the game's particle effects and sounds there (`Draw::Effect`, `Draw::Sound`), models of its own (`Draw::Model`) and a
-camera shake. [Example Bounce](https://github.com/AnythingGoes-ballest/ballest-example-bounce) has eight, each soft,
+the game's particle effects there (`Draw::Effect`), sounds (`Draw::Sound`: the game's, or `.wav` files of its own),
+models of its own (`Draw::Model`) and a
+camera shake. [Example Bounce](https://github.com/AnythingGoes-ballest/ballest-example-bounce) has fifteen, each soft,
 medium or hard by the hit.
 
 ```angelscript

@@ -1,9 +1,11 @@
 #include "draw.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <cstring>
 #include <map>
 #include <memory>
+#include <vector>
 
 #include "cosmetics.hpp"
 
@@ -29,6 +31,14 @@ int gGeneration = -1;
 
 int gCameraOwner = -1;
 eng::Weak gCamera;
+
+// Custom (.wav) sounds playing, and when their samples run out. Their procedural sound waves play on, silent, after the
+// samples (measured: still playing 6 s into a 2.1 s file), so each is stopped then (and, auto-destroyed, goes away).
+struct Playing {
+    eng::Weak component;
+    double end;
+};
+std::vector<Playing> gPlaying;
 
 struct Vec3 {
     double x, y, z;
@@ -76,6 +86,16 @@ void ViewThrough(Obj target) {
 }  // namespace
 
 void Frame() {
+    const double now = game::Seconds();
+    for (size_t i = 0; i < gPlaying.size();) {
+        Obj c = eng::Get(gPlaying[i].component);
+        if (c && now < gPlaying[i].end) {
+            i++;
+            continue;
+        }
+        if (c) eng::Call(c, "Stop");
+        gPlaying.erase(gPlaying.begin() + static_cast<std::ptrdiff_t>(i));
+    }
     // Models' spinning groups and animations (no ball: as still).
     for (auto& [id, shape] : gShapes)
         if (shape.built && shape.model && eng::Get(shape.actor)) models::Animate(*shape.model, *shape.built, nullptr, game::Seconds());
@@ -184,7 +204,113 @@ bool Effect(const std::string& system, double x, double y, double z, double scal
     return eng::Invoke(lib, p) && p.ReturnObj();
 }
 
+namespace {
+// A .wav file's samples: 16-bit PCM, interleaved.
+struct Wav {
+    int32_t rate = 0, channels = 0;
+    std::vector<uint8_t> pcm;
+};
+std::map<std::string, std::shared_ptr<Wav>> gWavs;     // by path, read once
+eng::Weak gLastSound;                                   // the last custom sound's audio component (for measuring)
+
+uint32_t U32(const uint8_t* p) { return p[0] | p[1] << 8 | p[2] << 16 | static_cast<uint32_t>(p[3]) << 24; }
+uint16_t U16(const uint8_t* p) { return static_cast<uint16_t>(p[0] | p[1] << 8); }
+
+// Reads a RIFF WAVE file of 16-bit PCM (mono or stereo, any rate). Null (and a log line) if it isn't one.
+std::shared_ptr<Wav> ReadWav(const std::string& path) {
+    if (auto it = gWavs.find(path); it != gWavs.end()) return it->second;
+    std::shared_ptr<Wav> wav;
+    std::vector<uint8_t> file;
+    if (FILE* f = _wfopen(eng::Widen(path).c_str(), L"rb")) {
+        uint8_t chunk[65536];
+        size_t n;
+        while ((n = std::fread(chunk, 1, sizeof chunk, f)) > 0) file.insert(file.end(), chunk, chunk + n);
+        std::fclose(f);
+    }
+    std::string why = file.empty() ? "can't be read" : "";
+    if (why.empty() && (file.size() < 12 || std::memcmp(file.data(), "RIFF", 4) || std::memcmp(file.data() + 8, "WAVE", 4)))
+        why = "isn't a WAVE file";
+    auto out = std::make_shared<Wav>();
+    int bits = 0, format = 0;
+    for (size_t at = 12; why.empty() && at + 8 <= file.size();) {
+        const uint32_t size = U32(&file[at + 4]);
+        const uint8_t* body = &file[at + 8];
+        if (at + 8 + size > file.size()) break;
+        if (!std::memcmp(&file[at], "fmt ", 4) && size >= 16) {
+            format = U16(body);
+            out->channels = U16(body + 2);
+            out->rate = static_cast<int32_t>(U32(body + 4));
+            bits = U16(body + 14);
+        } else if (!std::memcmp(&file[at], "data", 4)) {
+            out->pcm.assign(body, body + size);
+        }
+        at += 8 + size + (size & 1);
+    }
+    if (why.empty() && (format != 1 || bits != 16)) why = "isn't 16-bit PCM (export it as 16-bit PCM WAV)";
+    if (why.empty() && (out->channels < 1 || out->channels > 2 || out->rate < 8000 || out->pcm.empty())) why = "has no sound in it";
+    if (why.empty()) wav = out;
+    else hostlog::Warn("sound: " + path + " " + why);
+    gWavs[path] = wav;
+    return wav;
+}
+
+// Plays a plugin's own .wav through the game's audio: a procedural sound wave from Steam Integration Kit (in the game:
+// SIK_UserLibrary.ConstructSIKSoundWaveProcedural) with the samples queued on it, then SpawnSound2D.
+bool PlayWav(const std::string& path, double volume, double pitch) {
+    const auto wav = ReadWav(path);
+    Obj controller = game::PlayerController();
+    Obj lib = eng::FindCdo("SIK_UserLibrary");
+    if (!wav || !controller || !lib) return false;
+    const int32_t frames = static_cast<int32_t>(wav->pcm.size() / (2 * wav->channels));
+    eng::Params make(eng::FunctionOn(lib, "ConstructSIKSoundWaveProcedural"));
+    make.Set("SampleRate", wav->rate);
+    make.Set("NumChannels", wav->channels);
+    make.Set("Duration", static_cast<float>(static_cast<double>(frames) / wav->rate));
+    if (!eng::Invoke(lib, make)) return false;
+    Obj wave = make.ReturnObj();
+    if (!wave) return false;
+    struct Array {
+        const uint8_t* data;
+        int32_t num, max;
+    } samples{wav->pcm.data(), static_cast<int32_t>(wav->pcm.size()), static_cast<int32_t>(wav->pcm.size())};
+    eng::Params queue(eng::FunctionOn(wave, "SIK_QueueAudio"));
+    queue.Set("AudioData", samples);
+    if (!eng::Invoke(wave, queue)) return false;
+    Obj statics = eng::FindCdo("GameplayStatics");
+    eng::Params p(eng::FunctionOn(statics, "SpawnSound2D"));
+    p.Set("WorldContextObject", controller);
+    p.Set("Sound", wave);
+    p.Set("VolumeMultiplier", static_cast<float>(volume));
+    p.Set("PitchMultiplier", static_cast<float>(pitch));
+    p.Set("bAutoDestroy", uint8_t{1});
+    if (!eng::Invoke(statics, p)) return false;
+    Obj component = p.ReturnObj();
+    if (!component) return false;
+    gLastSound = eng::MakeWeak(component);
+    const double seconds = static_cast<double>(frames) / wav->rate / std::max(pitch, 0.05);
+    gPlaying.push_back({eng::MakeWeak(component), game::Seconds() + seconds + 0.1});
+    return true;
+}
+
+bool EndsWith(const std::string& s, const char* tail) {
+    const size_t n = std::strlen(tail);
+    if (s.size() < n) return false;
+    for (size_t i = 0; i < n; i++)
+        if (std::tolower(static_cast<unsigned char>(s[s.size() - n + i])) != tail[i]) return false;
+    return true;
+}
+}  // namespace
+
+std::string LastSoundState() {
+    Obj c = eng::Get(gLastSound);
+    if (!c) return "no custom sound (or it finished and was destroyed)";
+    const bool playing = eng::Call(c, "IsPlaying").ReturnAs<uint8_t>(0) != 0;
+    const int state = eng::Call(c, "GetPlayState").ReturnAs<uint8_t>(255);
+    return std::string("custom sound ") + (playing ? "playing" : "not playing") + ", play state " + std::to_string(state);
+}
+
 bool Sound(const std::string& sound, double volume, double pitch) {
+    if (EndsWith(sound, ".wav")) return PlayWav(sound, volume, pitch);
     Obj asset = sound.empty() ? nullptr : cosmetics::LoadAsset(eng::Widen(sound));
     Obj controller = game::PlayerController();
     if (!asset || !controller) return false;
