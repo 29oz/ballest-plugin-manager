@@ -1,6 +1,27 @@
 {
   "plugins": [
     {
+      "id": "chicken-cosmetic",
+      "name": "Chicken Ball",
+      "description": "Play Ballest as the chicken from Crossy Road!",
+      "author": "pulsion",
+      "repo": "29oz/chicken-cosmetic",
+      "version": "1.0.1",
+      "commit": "61c60e9f9331bfddb417a0538989c8c4dabc16b5",
+      "min_host": "0.16.0",
+      "icon": "icon.png",
+      "dependencies": [
+        "cosmetic-kit"
+      ],
+      "files": {
+        "info.toml": "04cd60ceca7703f5e86b16e4af41d20e5f58ef7fcaa26c4feb1d4419f24fc887",
+        "main.as": "bf8d773be771573cc06af4b2e615eb367cc0d5b6fd66ea1d1e4522b8cc15adc4",
+        "models/chicken_ball.txt": "84fb86b7226b97bbf6ac61039e3bc3b0b32d35cb5f96a20b0b90ed1ed2cd39f3",
+        "models/chicken.glb": "a4ec7817c1ef1e8f704317545d91c78aae8ff5f02fc1076defae0d12dc2734cc",
+        "icon.png": "b7f2855f0e285db44fb997a480509c79a204f5bca587bd1a5e35466e63086e6a"
+      }
+    },
+    {
       "id": "clear-tec-balls",
       "name": "Clear-Tec-Balls",
       "description": "Includes 2 Balls: Clear, Dots | and 1 Hat: Coors",
