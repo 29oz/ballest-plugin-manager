@@ -102,6 +102,28 @@
       }
     },
     {
+      "id": "dominus-ball",
+      "name": "Dominus Ball",
+      "description": "Adds a clear ball with the Dominus car from Rocket League inside, standing on the ground and facing where the ball goes.",
+      "author": "CryT4x",
+      "repo": "Cryt4x/ballest-dominus-ball",
+      "version": "1.0.1",
+      "commit": "9c47a85f2bcccee85a2feecc8879a451e0d9ead5",
+      "min_host": "0.16.0",
+      "icon": "icon.png",
+      "dependencies": [
+        "cosmetic-kit"
+      ],
+      "files": {
+        "info.toml": "1ddaf55ec3c3590c43719b6a6d016ab3149b8fbfb52dfb2beca305bdaf3c4e80",
+        "main.as": "ca29441bbd9c162d4c1ce2a005623ad618b51c707fc058083039d386e3f88e56",
+        "dominus_preview.png": "69db82485689e1be26e4549e62cbc1c7d2775d804217d3772043ba2173deefcb",
+        "icon.png": "69db82485689e1be26e4549e62cbc1c7d2775d804217d3772043ba2173deefcb",
+        "models/dominus.txt": "8116a19671345e3d037a92844400f61ab84d0b12ffaa2fe93007e92559f3123f",
+        "models/dominus.glb": "bf259e77fda8bc27f67ad2be51cf4b7ef8c6f93c87eeb41b15bfe04fe66c8a60"
+      }
+    },
+    {
       "id": "example-arms",
       "name": "Example Arms",
       "description": "Six arms for your ball, moving as it rolls: buff arms, zombie arms, skeleton arms, robot arms, crab claws and boxer arms.",
