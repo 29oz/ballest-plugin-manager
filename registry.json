@@ -88,14 +88,14 @@
       "description": "Track editor extras: drag to select, groups (G / U), rotate modes in the toolbar (center, mirrored), Shift/Ctrl+click to deselect, whole-unit placement, placement distance, rotated copies, Tab between transform boxes.",
       "author": "AnythingGoes",
       "repo": "AnythingGoes-ballest/ballest-create-extensions",
-      "version": "0.6.0",
-      "commit": "527e2a111146899f0d04f0f5aca35a1511897b0f",
+      "version": "0.7.0",
+      "commit": "7b97052c79ac97a6caa7c1d7a24a77991cbc31b7",
       "min_host": "0.16.1",
       "icon": "icon.png",
       "dependencies": [],
       "files": {
-        "info.toml": "f081a2b3cc3c2e09dd74d5bed4783a481c434e2eb73ce0d1f973dbdfd86c921e",
-        "main.as": "292d3379d43cd7eeeea4dfaa1ab9b27e5fef0548bc1837d6ad1890349a9207c3",
+        "info.toml": "81624bebbf39c24af89176f9493556ae0878a3cc14ef8e704a676c7b0958fb5f",
+        "main.as": "179403545d6cfa23226ceb2fad6ac3a3dbdc700ff05b842806133fe578b8000d",
         "keyboard_g.png": "beaedfc27e44bc1748d8e8d76b7b9f2e6444a323b7a1860a7ae6e727dbe995d0",
         "keyboard_u.png": "a9c0359e7d3764483af43e68584262ed432912e163404bdd3fff78c73b8b380d",
         "icon.png": "673495590b04fbc8b8a75af30e0eed74dc9b34ef11584f3e66fea362e53b74fe"
