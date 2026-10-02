@@ -1887,6 +1887,22 @@ goes when the plugin stops. If two plugins set one, the last one shows.
 --
 Leaderboard::SetTitleNote("· 12,345 players");
 
+== Leaderboard::OverallPlayers
+How many players are on the main menu's overall leaderboard (the bar along the top): Steam's entry count for the
+season board it shows. -1 off the main menu, or before the bar has found its board (a moment after the menu shows).
+Requires host 0.22.0.
+--
+int players = Leaderboard::OverallPlayers();
+if (players > 0)
+    Leaderboard::SetOverallNote("" + players);
+
+== Leaderboard::SetOverallNote
+Shows a short note before the "overall" label of the main menu's leaderboard bar, kept there when the game rebuilds its
+screens; `""` removes it. It goes when the plugin stops. If two plugins set one, the last one shows. Requires host
+0.22.0.
+--
+Leaderboard::SetOverallNote("12,583");
+
 @@ Ghosts
 The leaderboard ghosts of the track on screen: the top entries of its Steam leaderboard and your own, each with the
 path its ball took. Everything here needs host 0.14.0. Loading takes a few seconds (every replay is a download); read

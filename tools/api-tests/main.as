@@ -1332,6 +1332,13 @@ void RegisterTrack()
                            Is(!Race::IsComplete(), "Race::IsComplete before the race"), Is(Host::MapNumber() > 0, "Host::MapNumber " + Host::MapNumber())};
         return All(c);
     }, 20);
+    Add("ui", "Leaderboard overall players and note", "Leaderboard::OverallPlayers,Leaderboard::SetOverallNote", function() {
+        if (Leaderboard::OverallPlayers() <= 0)
+            return WAIT;                    // the bar finds its board a moment after the menu shows
+        Leaderboard::SetOverallNote("api note");
+        Leaderboard::SetOverallNote("");
+        return PASS;
+    }, 30);
     Add("track", "Leaderboard players and note", "Leaderboard::Players,Leaderboard::SetTitleNote", function() {
         if (Leaderboard::Players() <= 0)
             return WAIT;

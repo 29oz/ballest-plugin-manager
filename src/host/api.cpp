@@ -999,11 +999,14 @@ bool CosmeticsEquip(int kind, const std::string& id) { return kind >= 0 && kind 
 std::string CosmeticsEquipped(int kind) { return kind >= 0 && kind <= 2 ? cosmetics::Equipped(KindOf(kind)) : ""; }
 
 void LeaderboardNote(const std::string& note) { leaderboard::SetTitleNote(plugins::Current(), note); }
+void LeaderboardOverallNote(const std::string& note) { leaderboard::SetOverallNote(plugins::Current(), note); }
 
 void RegisterLeaderboard() {
     e->SetDefaultNamespace("Leaderboard");
     Global("int Players()", asFUNCTION(leaderboard::Players));
     Global("void SetTitleNote(const string &in)", asFUNCTION(LeaderboardNote));
+    Global("int OverallPlayers()", asFUNCTION(leaderboard::OverallPlayers));
+    Global("void SetOverallNote(const string &in)", asFUNCTION(LeaderboardOverallNote));
 }
 
 void RegisterCosmetics() {

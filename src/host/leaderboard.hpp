@@ -11,6 +11,11 @@ namespace leaderboard {
 void Frame();                                   // keeps the note on the title (the game rebuilds its UI)
 int Players();                                  // players on the board on screen inside a map, or -1
 void SetTitleNote(int owner, const std::string& note);   // "" removes it; `owner` is the plugin (last one wins)
+// The main menu's overall leaderboard (the bar at the top, WBP_HeaderSeasonScore): how many players it has, and a note
+// before its "overall" label. Read from the game's Blueprint: the bar finds the season's Steam leaderboard by name and
+// keeps its id in its graph's Temp_int_Variable; the label is its text block named "TextBlock".
+int OverallPlayers();                           // players on the overall leaderboard, or -1 (not on the main menu)
+void SetOverallNote(int owner, const std::string& note);
 void RemoveOwner(int owner);
 
 }  // namespace leaderboard
