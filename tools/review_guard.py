@@ -32,7 +32,7 @@ CONSOLE_ALLOWED_PATHS = ("tools/api-tests/", "plugins/plugin-manager/")
 # reason and a link.
 EXCEPTIONS = {
     ("practice-checkpoints", "70b302d"): "Practice Checkpoints 0.3.0 predates the rule; Pedro has been asked to move "
-                                         "off Console:: (issue on Pedro-Brito-09/ballest-plugins).",
+                                         "off Console:: (https://github.com/Pedro-Brito-09/ballest-plugins/issues/1).",
 }
 
 
