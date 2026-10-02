@@ -23,6 +23,16 @@ constexpr int kUGCQueryCompleted = 3401, kUGCQueryCompletedSize = 280;
 // m_hPreviewFile at 9224 (after m_rgchTags[1025] from 8187, aligned to 8); the whole struct is a little under 10 KB,
 // so it is read into a larger buffer.
 constexpr size_t kDetailsTitle = 24, kDetailsTitleSize = 129, kDetailsOwner = 8160, kDetailsPreview = 9224, kDetailsBuffer = 16384;
+// The rest of SteamUGCDetails_t (fields in the order of Steamworks.NET's SteamStructs.cs, sizes from its
+// SteamConstants.cs, 8-byte packing): m_rgchDescription[8000] at 153, m_rtimeCreated 8168, m_rtimeUpdated 8172,
+// m_rgchTags[1025] 8187, m_pchFileName[260] 9232, m_nFileSize 9492, m_rgchURL[256] 9500, m_unVotesUp 9756,
+// m_unVotesDown 9760, m_flScore 9764, m_unNumChildren 9768, m_ulTotalFilesSize 9776.
+constexpr size_t kDetailsDescription = 153, kDetailsDescriptionSize = 8000, kDetailsCreated = 8168, kDetailsUpdated = 8172,
+                 kDetailsTags = 8187, kDetailsTagsSize = 1025, kDetailsFileSize = 9492, kDetailsVotesUp = 9756,
+                 kDetailsVotesDown = 9760, kDetailsScore = 9764;
+constexpr uint32_t kMetadataMax = 10000;  // k_cchDeveloperMetadataMax (Steamworks.NET SteamConstants.cs)
+// EItemStatistic
+constexpr int kStatFavorites = 1, kStatUniqueSubscriptions = 3, kStatPlaytimeSessions = 9;
 constexpr int kLeaderboardRequestGlobal = 0, kLeaderboardRequestAroundUser = 1;   // ELeaderboardDataRequest
 constexpr int kUGCQueryRankedByTextSearch = 11, kUGCMatchingItems = 0;           // EUGCQuery, EUGCMatchingUGCType
 constexpr int kUGCReadUntilFinished = 0;                                         // EUGCReadAction
@@ -50,6 +60,23 @@ struct Api {
     bool (*itemInstallInfo)(void*, uint64_t, uint64_t*, char*, uint32_t, uint32_t*) = nullptr;
     bool (*downloadItem)(void*, uint64_t, bool) = nullptr;
     bool ok = false;
+    // For QueryWorkshop and names: not needed by the rest, so missing ones only turn those off.
+    void* friends = nullptr;
+    void* user = nullptr;
+    uint64_t (*createUserQuery)(void*, uint32_t, int, int, int, uint32_t, uint32_t, uint32_t) = nullptr;
+    uint64_t (*createDetailsQuery)(void*, const uint64_t*, uint32_t) = nullptr;
+    bool (*addRequiredTag)(void*, uint64_t, const char*) = nullptr;
+    bool (*addExcludedTag)(void*, uint64_t, const char*) = nullptr;
+    bool (*setMatchAnyTag)(void*, uint64_t, bool) = nullptr;
+    bool (*setTrendDays)(void*, uint64_t, uint32_t) = nullptr;
+    bool (*setPlaytimeStats)(void*, uint64_t, uint32_t) = nullptr;
+    bool (*setReturnMetadata)(void*, uint64_t, bool) = nullptr;
+    bool (*queryMetadata)(void*, uint64_t, uint32_t, char*, uint32_t) = nullptr;
+    bool (*queryStatistic)(void*, uint64_t, uint32_t, int, uint64_t*) = nullptr;
+    const char* (*personaName)(void*, uint64_t) = nullptr;
+    bool (*requestUserInfo)(void*, uint64_t, bool) = nullptr;
+    uint64_t (*steamId)(void*) = nullptr;
+    bool queries = false, names = false;
 };
 
 Api& TheApi() {
@@ -97,6 +124,27 @@ Api& TheApi() {
              api.sendQuery && api.queryResult && api.releaseQuery && api.itemState && api.itemInstallInfo && api.downloadItem &&
              api.entryCount;
     hostlog::Info(api.ok ? "steam: ready" : "steam: not everything needed is there; leaderboard ghosts are off");
+    // SteamFriends_v018 and SteamUser_v023: the versions the game's steam_api64.dll exports (read from the DLL).
+    api.friends = open("SteamAPI_SteamFriends_v018");
+    api.user = open("SteamAPI_SteamUser_v023");
+    api.createUserQuery = reinterpret_cast<decltype(api.createUserQuery)>(get("SteamAPI_ISteamUGC_CreateQueryUserUGCRequest"));
+    api.createDetailsQuery = reinterpret_cast<decltype(api.createDetailsQuery)>(get("SteamAPI_ISteamUGC_CreateQueryUGCDetailsRequest"));
+    api.addRequiredTag = reinterpret_cast<decltype(api.addRequiredTag)>(get("SteamAPI_ISteamUGC_AddRequiredTag"));
+    api.addExcludedTag = reinterpret_cast<decltype(api.addExcludedTag)>(get("SteamAPI_ISteamUGC_AddExcludedTag"));
+    api.setMatchAnyTag = reinterpret_cast<decltype(api.setMatchAnyTag)>(get("SteamAPI_ISteamUGC_SetMatchAnyTag"));
+    api.setTrendDays = reinterpret_cast<decltype(api.setTrendDays)>(get("SteamAPI_ISteamUGC_SetRankedByTrendDays"));
+    api.setPlaytimeStats = reinterpret_cast<decltype(api.setPlaytimeStats)>(get("SteamAPI_ISteamUGC_SetReturnPlaytimeStats"));
+    api.setReturnMetadata = reinterpret_cast<decltype(api.setReturnMetadata)>(get("SteamAPI_ISteamUGC_SetReturnMetadata"));
+    api.queryMetadata = reinterpret_cast<decltype(api.queryMetadata)>(get("SteamAPI_ISteamUGC_GetQueryUGCMetadata"));
+    api.queryStatistic = reinterpret_cast<decltype(api.queryStatistic)>(get("SteamAPI_ISteamUGC_GetQueryUGCStatistic"));
+    api.personaName = reinterpret_cast<decltype(api.personaName)>(get("SteamAPI_ISteamFriends_GetFriendPersonaName"));
+    api.requestUserInfo = reinterpret_cast<decltype(api.requestUserInfo)>(get("SteamAPI_ISteamFriends_RequestUserInformation"));
+    api.steamId = reinterpret_cast<decltype(api.steamId)>(get("SteamAPI_ISteamUser_GetSteamID"));
+    api.queries = api.ok && api.createUserQuery && api.createDetailsQuery && api.addRequiredTag && api.addExcludedTag &&
+                  api.setMatchAnyTag && api.setTrendDays && api.setPlaytimeStats && api.setReturnMetadata && api.queryMetadata &&
+                  api.queryStatistic;
+    api.names = api.friends && api.user && api.personaName && api.requestUserInfo && api.steamId;
+    if (!api.queries || !api.names) hostlog::Warn("steam: workshop queries or player names are missing; Workshop is off");
     return api;
 }
 
@@ -236,6 +284,99 @@ void SearchWorkshop(const std::string& text, int page, std::function<void(bool, 
         a.releaseQuery(a.ugc, query);
         done(ok, std::move(items), total);
     });
+}
+
+void QueryWorkshop(const Query& q, std::function<void(bool, std::vector<Details>, int)> done) {
+    Api& api = TheApi();
+    if (!api.queries) return done(false, {}, 0);
+    const uint32_t app = api.appId(api.utils);
+    const uint32_t page = static_cast<uint32_t>(q.page < 1 ? 1 : q.page);
+    uint64_t query = 0;
+    if (q.kind == Query::kAll) {
+        query = api.createQuery(api.ugc, q.rank, kUGCMatchingItems, app, app, page);
+    } else if (q.kind == Query::kUser) {
+        query = api.createUserQuery(api.ugc, q.account, q.list, kUGCMatchingItems, q.userSort, app, app, page);
+    } else {
+        if (q.ids.empty()) return done(true, {}, 0);
+        const size_t n = std::min<size_t>(q.ids.size(), kResultsPerPage);
+        query = api.createDetailsQuery(api.ugc, q.ids.data(), static_cast<uint32_t>(n));
+    }
+    if (!query || query == ~0ull) return done(false, {}, 0);
+    if (q.kind == Query::kAll) {
+        if (!q.text.empty()) api.setSearchText(api.ugc, query, q.text.c_str());
+        for (const auto& tag : q.with) api.addRequiredTag(api.ugc, query, tag.c_str());
+        for (const auto& tag : q.without) api.addExcludedTag(api.ugc, query, tag.c_str());
+        if (q.anyTag && !q.with.empty()) api.setMatchAnyTag(api.ugc, query, true);
+        if (q.rank == kRankTrend) api.setTrendDays(api.ugc, query, static_cast<uint32_t>(q.trendDays < 1 ? 1 : q.trendDays));
+    }
+    // As the game's own hub asks (DA_DefaultHubQueries: metadata, and playtime stats for 0 days).
+    api.setReturnMetadata(api.ugc, query, true);
+    api.setPlaytimeStats(api.ugc, query, 0);
+    Start(api.sendQuery(api.ugc, query), kUGCQueryCompleted, kUGCQueryCompletedSize, [done, query](const uint8_t* r, bool failed) {
+        Api& a = TheApi();
+        std::vector<Details> items;
+        int total = 0;
+        const bool ok = !failed && r && At<int32_t>(r, 8) == kResultOk;
+        if (ok) {
+            const uint32_t count = At<uint32_t>(r, 12);
+            total = static_cast<int>(At<uint32_t>(r, 16));
+            std::vector<uint8_t> d(kDetailsBuffer);
+            std::vector<char> metadata(kMetadataMax + 1);
+            auto text = [&](size_t at, size_t size) {
+                const char* s = reinterpret_cast<const char*>(d.data() + at);
+                return std::string(s, strnlen(s, size));
+            };
+            for (uint32_t i = 0; i < count; ++i) {
+                std::fill(d.begin(), d.end(), uint8_t{0});
+                if (!a.queryResult(a.ugc, query, i, d.data())) continue;
+                Details item;
+                item.id = At<uint64_t>(d.data(), 0);
+                if (!item.id) continue;
+                item.owner = At<uint64_t>(d.data(), kDetailsOwner);
+                item.preview = At<uint64_t>(d.data(), kDetailsPreview);
+                if (item.preview == ~0ull) item.preview = 0;
+                item.title = text(kDetailsTitle, kDetailsTitleSize);
+                item.description = text(kDetailsDescription, kDetailsDescriptionSize);
+                item.tags = text(kDetailsTags, kDetailsTagsSize);
+                item.created = At<uint32_t>(d.data(), kDetailsCreated);
+                item.updated = At<uint32_t>(d.data(), kDetailsUpdated);
+                item.size = At<int32_t>(d.data(), kDetailsFileSize);
+                item.votesUp = At<uint32_t>(d.data(), kDetailsVotesUp);
+                item.votesDown = At<uint32_t>(d.data(), kDetailsVotesDown);
+                item.score = At<float>(d.data(), kDetailsScore);
+                std::fill(metadata.begin(), metadata.end(), char{0});
+                if (a.queryMetadata(a.ugc, query, i, metadata.data(), kMetadataMax)) item.metadata = metadata.data();
+                uint64_t v = 0;
+                if (a.queryStatistic(a.ugc, query, i, kStatPlaytimeSessions, &v)) item.plays = v;
+                v = 0;
+                if (a.queryStatistic(a.ugc, query, i, kStatUniqueSubscriptions, &v)) item.subscribers = v;
+                v = 0;
+                if (a.queryStatistic(a.ugc, query, i, kStatFavorites, &v)) item.favorites = v;
+                items.push_back(std::move(item));
+            }
+        }
+        a.releaseQuery(a.ugc, query);
+        done(ok, std::move(items), total);
+    });
+}
+
+std::string PersonaName(uint64_t steamId) {
+    Api& api = TheApi();
+    if (!api.names || !steamId) return "";
+    const char* name = api.personaName(api.friends, steamId);
+    // "[unknown]" until Steam has the user's information (ISteamFriends::GetFriendPersonaName).
+    if (!name || !*name || std::strcmp(name, "[unknown]") == 0) return "";
+    return name;
+}
+
+bool RequestPersona(uint64_t steamId) {
+    Api& api = TheApi();
+    return api.names && steamId && api.requestUserInfo(api.friends, steamId, true);
+}
+
+uint64_t OwnSteamId() {
+    Api& api = TheApi();
+    return api.names ? api.steamId(api.user) : 0;
 }
 
 uint32_t ItemState(uint64_t item) {

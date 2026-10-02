@@ -434,6 +434,48 @@ bool WriteBool(Obj o, const std::string& name, bool value) {
     return true;
 }
 
+// TMap memory, from the engine source (FScriptMap / FScriptSet / FScriptSparseArray): a TSet of
+// TSetElement<TPair<K, V>> {pair, HashNextId int32, HashIndex int32}, kept in a TSparseArray: TArray Data
+// {ptr, Num, Max} at 0, TBitArray AllocationFlags at 16 (TInlineAllocator<4>: four inline words, then the secondary
+// allocation's pointer at 32; NumBits 40, MaxBits 44), FirstFreeIndex 48, NumFreeIndices 52; then the hash. 80 bytes in
+// all, as the type dump gives every map property. An element of the array is in use when its flag bit is set.
+bool ForEachMapEntry(Obj o, const std::string& name, int keyAlign, int valueAlign,
+                     const std::function<void(const uint8_t*, const uint8_t*)>& f) {
+    if (!o) return false;
+    const Prop p = FindProp(ClassOf(o), name);
+    if (!p || KindOf(p) != "MapProperty" || p.size != 80) {
+        ReportOnce("map " + name);
+        return false;
+    }
+    const uint8_t* keyProp = At<uint8_t*>(p.field, layout::kFMapPropertyKeyOffset);
+    const uint8_t* valueProp = At<uint8_t*>(p.field, layout::kFMapPropertyValueOffset);
+    if (!keyProp || !valueProp) return false;
+    const int keySize = At<int32_t>(keyProp, layout::kFPropertyValueSizeOffset);
+    const int valueSize = At<int32_t>(valueProp, layout::kFPropertyValueSizeOffset);
+    auto alignUp = [](int v, int a) { return (v + a - 1) / a * a; };
+    const int valueOffset = alignUp(keySize, valueAlign);
+    const int pairAlign = std::max(keyAlign, valueAlign);
+    const int pairSize = alignUp(valueOffset + valueSize, pairAlign);
+    const int elementSize = alignUp(pairSize + 8, std::max(pairAlign, 4));
+    const uint8_t* map = o + p.offset;
+    const uint8_t* data = At<uint8_t*>(map, 0);
+    const int32_t num = At<int32_t>(map, 8), max = At<int32_t>(map, 12);
+    const uint32_t* secondary = At<uint32_t*>(map, 32);
+    const int32_t numBits = At<int32_t>(map, 40), numFree = At<int32_t>(map, 52);
+    if (num < 0 || num > max || num > 1000000 || numBits < num || numFree < 0 || numFree > num || (num > 0 && !data) ||
+        (numBits > 128 && !secondary) || keySize <= 0 || valueSize <= 0) {
+        ReportOnce("map " + name + " (unexpected layout)");
+        return false;
+    }
+    const uint32_t* words = secondary ? secondary : reinterpret_cast<const uint32_t*>(map + 16);
+    for (int32_t i = 0; i < num; ++i)
+        if ((words[i / 32] >> (i % 32)) & 1u) {
+            const uint8_t* element = data + static_cast<size_t>(i) * static_cast<size_t>(elementSize);
+            f(element, element + valueOffset);
+        }
+    return true;
+}
+
 // --- functions -----------------------------------------------------------------------------------------------------
 
 std::vector<ParamInfo> ParamsOf(Obj fn) {

@@ -44,6 +44,45 @@ int EntryCount(uint64_t leaderboard);
 // Workshop items of this game matching the text, one page of results (1-based); total is all the matches.
 void SearchWorkshop(const std::string& text, int page, std::function<void(bool ok, std::vector<Item>, int total)> done);
 
+// A workshop query of this game's items, one page of up to 50 (kResultsPerPage) results (1-based pages).
+//   * kAll: every item, ranked by `rank` (EUGCQuery), matching `text` (title, description or tags), with every tag in
+//     `with` (any one of them if `anyTag`) and none in `without`; `trendDays` for the trend rankings.
+//   * kUser: one Steam account's list (EUserUGCList `list`, sorted by EUserUGCListSortOrder `userSort`).
+//   * kIds: the items with these ids (one page, at most 50).
+constexpr int kResultsPerPage = 50;
+struct Query {
+    enum Kind { kAll, kUser, kIds } kind = kAll;
+    int rank = 0, trendDays = 7, page = 1;
+    std::string text;
+    std::vector<std::string> with, without;
+    bool anyTag = false;
+    uint32_t account = 0;
+    int list = 0, userSort = 0;
+    std::vector<uint64_t> ids;
+};
+// EUGCQuery, EUserUGCList and EUserUGCListSortOrder values used (the game's SIK enums carry the same values).
+constexpr int kRankVote = 0, kRankPublished = 1, kRankTrend = 3, kRankNotYetRated = 8, kRankVotesUp = 10,
+              kRankTextSearch = 11, kRankSubscriptions = 12, kRankPlaySessions = 18, kRankUpdated = 19;
+constexpr int kListPublished = 0, kListVotedUp = 2, kListVotedDown = 3, kListFavorited = 5, kListSubscribed = 6,
+              kListPlayed = 7;
+constexpr int kSortNewest = 0, kSortOldest = 1, kSortTitle = 2, kSortUpdated = 3, kSortSubscribed = 4, kSortTop = 5;
+
+struct Details {
+    uint64_t id = 0, owner = 0, preview = 0;
+    std::string title, description, tags, metadata;
+    uint32_t created = 0, updated = 0, votesUp = 0, votesDown = 0;
+    float score = 0;
+    int64_t size = 0;
+    uint64_t plays = 0, subscribers = 0, favorites = 0;
+};
+void QueryWorkshop(const Query& query, std::function<void(bool ok, std::vector<Details>, int total)> done);
+
+// A Steam user's name as Steam shows it to this player; "" while unknown (asking for it starts a request: Steam keeps
+// the name once it arrives). Your own Steam id.
+std::string PersonaName(uint64_t steamId);
+bool RequestPersona(uint64_t steamId);
+uint64_t OwnSteamId();
+
 // A workshop item on this computer: EItemState flags (Subscribed 1, Installed 4, NeedsUpdate 8, Downloading 16,
 // DownloadPending 32), where it is installed ("" if it isn't), and asking Steam to download it (as the game's own
 // track browser does before playing one).

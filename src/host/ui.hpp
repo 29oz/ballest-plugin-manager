@@ -61,9 +61,10 @@ void HideOwner(int owner);              // a stopped plugin: its windows and pan
 // handles to them, and those stay valid but show nothing.
 enum class Kind { Text, Button, IconButton, Slider, Dropdown, Space, TextArea, TextInput, Image, CheckBox, Rect };
 
-// Where a window lives: its own layer on screen, or docked as a section of the track editor's details panel
-// (shown only while pieces are selected, since the panel's section list is).
-enum class Dock { Screen, EditorDetails };
+// Where a window lives: its own layer on screen, docked as a section of the track editor's details panel
+// (shown only while pieces are selected, since the panel's section list is), or docked as a row of the game's track
+// hub, under its header and page row (hub.hpp: DockPanel).
+enum class Dock { Screen, EditorDetails, Hub };
 
 struct Window;
 
@@ -105,6 +106,7 @@ struct Widget {
     std::string pendingValue;                                               // text input: text for the box
     bool valuePending = false;
     bool submitPending = false, submitRequested = false, focusRequested = false, focused = false;
+    bool clearButton = false, clearedPending = false;                       // text input: an x that empties it
     int focusAttempts = 0;
     bool scrollToEnd = false;                                               // text area
     // live widgets and what they last showed (a text area's main is its ScrollBox, label its TextBlock)

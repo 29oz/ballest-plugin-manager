@@ -608,6 +608,38 @@ void Run(const std::string& cmd) {
              }
              Report(c + " -> no such map on the Create page");
          }},
+        {"hubopen", [](const Args&, const std::string& c) {        // the play page, then its hub tab (WBP_0_Play tab 2)
+             for (eng::Obj manager : Instances("WBP_MainMenu_UIManager_C", "Transient")) {
+                 eng::Call(manager, "DoPlay");
+                 eng::Obj play = eng::ReadObj(manager, "WBP_Play_1");
+                 const int32_t hubTab = 2;          // SwitchToPageMatchingTabIndex: 2 shows Body_WS 1 (the hub)
+                 if (!play || !eng::WriteBytes(play, "ActiveTabIndex", &hubTab, sizeof hubTab)) return Report(c + " -> no play page");
+                 return Report(c + (eng::Call(play, "SwitchToPageMatchingTabIndex").Invoked() ? " -> ok" : " -> failed"));
+             }
+             Report(c + " -> no main menu");
+         }},
+        {"hubtag", [](const Args& a, const std::string& c) {      // hubtag <i>: picks the hub home's i-th filter tag, as
+             // its button does (WBP_HubHomeFilterGroup: UIManager.AddOrRemoveTagFilter(false, false, tag))
+             const auto groups = Instances("WBP_HubHomeFilterGroup_C", "Transient");
+             const auto managers = Instances("WBP_MainMenu_UIManager_C", "Transient");
+             if (groups.empty() || managers.empty()) return Report(c + " -> no hub filter group or menu");
+             uint8_t array[16] = {};
+             if (!eng::ReadBytes(groups.front(), "Tags", array, sizeof array)) return Report(c + " -> no tags");
+             const uint8_t* data = nullptr;
+             int32_t num = 0;
+             std::memcpy(&data, array, sizeof data);
+             std::memcpy(&num, array + 8, sizeof num);
+             const int i = std::atoi(Arg(a, 1).c_str());
+             if (!data || i < 0 || i >= num) return Report(c + " -> only " + std::to_string(num) + " tags");
+             uint32_t name[2] = {};
+             std::memcpy(name, data + i * 8, sizeof name);
+             eng::Params p(eng::FunctionOn(managers.front(), "AddOrRemoveTagFilter"));
+             p.SetArg(0, uint8_t{0});
+             p.SetArg(1, uint8_t{0});
+             p.SetArg(2, data + i * 8, 8);
+             const bool ok = eng::Invoke(managers.front(), p);
+             Report(c + " -> " + eng::Name(name[0], static_cast<int32_t>(name[1])) + (ok ? " picked" : " failed"));
+         }},
         {"race", [](const Args&, const std::string&) {             // the race: run, track, practice, input
              const auto& t = race::CurrentTrack();
              double x = 0, y = 0;

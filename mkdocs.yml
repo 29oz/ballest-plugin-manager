@@ -81,6 +81,8 @@ nav:
       - Leaderboard: reference/api/leaderboard.md
       - Ghosts: reference/api/ghosts.md
       - Tracks: reference/api/tracks.md
+      - Workshop: reference/api/workshop.md
+      - Hub: reference/api/hub.md
       - Draw: reference/api/draw.md
       - Camera: reference/api/camera.md
       - Math: reference/api/math.md

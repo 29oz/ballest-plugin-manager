@@ -23,6 +23,8 @@
 #include "postprocess.hpp"
 #include "ghosts.hpp"
 #include "tracks.hpp"
+#include "workshop.hpp"
+#include "hub.hpp"
 #include "game.hpp"
 #include "hud.hpp"
 #include "input.hpp"
@@ -354,6 +356,12 @@ void InputSetValue(ui::Widget* w, const std::string& s) {
     w->valuePending = true;
 }
 void InputClearOnSubmit(ui::Widget* w, bool on) { w->clearOnSubmit = on; }
+void InputClearButton(ui::Widget* w, bool on) { w->clearButton = on; }
+bool InputCleared(ui::Widget* w) {
+    const bool c = w->clearedPending;
+    w->clearedPending = false;
+    return c;
+}
 void InputReadOnly(ui::Widget* w, bool on) {
     w->readOnly = on;
     w->readOnlyPending = true;
@@ -379,6 +387,10 @@ void WinCardBackground(ui::Window* w, float r, float g, float b, float a) {
 }
 void WinDockInEditorDetails(ui::Window* w) {
     w->dock = ui::Dock::EditorDetails;
+    w->layoutDirty = true;
+}
+void WinDockInHub(ui::Window* w) {
+    w->dock = ui::Dock::Hub;
     w->layoutDirty = true;
 }
 
@@ -622,6 +634,7 @@ void RegisterUi() {
     Method("Window", "void SetBlocksClicks(bool)", asFUNCTION(WinBlocksClicks));
     Method("Window", "CheckBox@ AddCheckBox(const string &in label, float size = 16)", asFUNCTION(WinCheckBox));
     Method("Window", "void DockInEditorDetails()", asFUNCTION(WinDockInEditorDetails));
+    Method("Window", "void DockInHub()", asFUNCTION(WinDockInHub));
     Method("Window", "void StartHeader()", asFUNCTION(WinStartHeader));
     Method("Window", "void StartCard()", asFUNCTION(WinStartCard));
     Method("Window", "void EndCard()", asFUNCTION(WinEndCard));
@@ -676,6 +689,9 @@ void RegisterUi() {
     Method("TextInput", "void Submit()", asFUNCTION(InputSubmit));
     Method("TextInput", "void set_value(const string &in) property", asFUNCTION(InputSetValue));
     Method("TextInput", "void set_clearOnSubmit(bool) property", asFUNCTION(InputClearOnSubmit));
+    // an x at the box's right end that empties it (set it straight after AddTextInput, before the window is shown)
+    Method("TextInput", "void set_clearButton(bool) property", asFUNCTION(InputClearButton));
+    Method("TextInput", "bool Cleared()", asFUNCTION(InputCleared));
     Method("TextInput", "void set_readOnly(bool) property", asFUNCTION(InputReadOnly));
     Method("CheckBox", "bool get_checked() property", asFUNCTION(CheckGet));
     Method("CheckBox", "void set_checked(bool) property", asFUNCTION(CheckSet));
@@ -1248,6 +1264,177 @@ bool TracksOpenWorkshop(const std::string& id) {
 }
 std::string TracksOpenState() { return tracks::OpenState(); }
 
+// --- Workshop ------------------------------------------------------------------------------------------------------
+uint64_t IdOf(const std::string& s) { return std::strtoull(s.c_str(), nullptr, 10); }
+std::string IdText(uint64_t id) { return id ? std::to_string(id) : ""; }
+int Reported(int query, const std::string& error) {
+    if (query < 0) hostlog::Write("warn", plugins::CurrentId(), "Workshop: " + error);
+    return query;
+}
+int WorkshopFind(const std::string& text, const std::string& sort, int page, int days, const CScriptArray* with,
+                 const CScriptArray* without, bool anyTag) {
+    std::string error;
+    return Reported(workshop::Find(text, sort, page, days, VectorOf<std::string>(with), VectorOf<std::string>(without), anyTag, &error), error);
+}
+int WorkshopFindList(const std::string& list, const std::string& user, const std::string& sort, int page) {
+    std::string error;
+    return Reported(workshop::FindList(list, IdOf(user), sort, page, &error), error);
+}
+int WorkshopFindIds(const CScriptArray* ids) {
+    std::vector<uint64_t> numbers;
+    for (const auto& id : VectorOf<std::string>(ids))
+        if (uint64_t n = IdOf(id)) numbers.push_back(n);
+    std::string error;
+    return Reported(workshop::FindIds(numbers, &error), error);
+}
+std::string WorkshopState(int q) { return workshop::State(q); }
+int WorkshopCount(int q) { return workshop::Count(q); }
+int WorkshopTotal(int q) { return workshop::Total(q); }
+std::string WorkshopId(int q, int i) { return IdText(workshop::IdAt(q, i)); }
+void WorkshopForget(int q) { workshop::Forget(q); }
+const steam::Details& ItemOf(const std::string& id) {
+    static const steam::Details none;
+    const steam::Details* item = workshop::Item(IdOf(id));
+    return item ? *item : none;
+}
+std::string WorkshopTitle(const std::string& id) { return ItemOf(id).title; }
+std::string WorkshopAuthor(const std::string& id) { return IdText(ItemOf(id).owner); }
+std::string WorkshopDescription(const std::string& id) { return ItemOf(id).description; }
+std::string WorkshopTags(const std::string& id) { return ItemOf(id).tags; }
+int64_t WorkshopCreated(const std::string& id) { return ItemOf(id).created; }
+int64_t WorkshopUpdated(const std::string& id) { return ItemOf(id).updated; }
+int WorkshopVotesUp(const std::string& id) { return static_cast<int>(ItemOf(id).votesUp); }
+int WorkshopVotesDown(const std::string& id) { return static_cast<int>(ItemOf(id).votesDown); }
+float WorkshopScore(const std::string& id) { return ItemOf(id).score; }
+int64_t WorkshopPlays(const std::string& id) { return static_cast<int64_t>(ItemOf(id).plays); }
+int64_t WorkshopSubscribers(const std::string& id) { return static_cast<int64_t>(ItemOf(id).subscribers); }
+int64_t WorkshopFavorites(const std::string& id) { return static_cast<int64_t>(ItemOf(id).favorites); }
+int64_t WorkshopSize(const std::string& id) { return ItemOf(id).size; }
+std::string WorkshopImage(const std::string& id) { return workshop::Image(IdOf(id)); }
+std::string WorkshopName(const std::string& steamId) { return workshop::Name(IdOf(steamId)); }
+std::string WorkshopMe() { return IdText(workshop::Me()); }
+double WorkshopMyBest(const std::string& id) {
+    plugins::GameWork work;
+    return workshop::MyBest(IdOf(id));
+}
+int WorkshopMyMedal(const std::string& id) {
+    plugins::GameWork work;
+    return workshop::MyMedal(IdOf(id));
+}
+CScriptArray* WorkshopFinished() {
+    plugins::GameWork work;
+    std::vector<std::string> ids;
+    for (uint64_t id : workshop::Finished()) ids.push_back(std::to_string(id));
+    return StringArrayOf(ids);
+}
+int WorkshopMyRank(const std::string& id) { return workshop::MyRank(IdOf(id)); }
+int WorkshopPlayers(const std::string& id) { return workshop::Players(IdOf(id)); }
+
+bool HubShown() {
+    plugins::GameWork work;
+    return hub::Shown();
+}
+bool HubSearch(const std::string& text, const std::string& sort, int days, const std::string& author, const CScriptArray* withTags,
+               bool anyTag, bool gameTags, bool show) {
+    plugins::GameWork work;
+    std::string error;
+    if (hub::Search(text, sort, days, IdOf(author), VectorOf<std::string>(withTags), show, anyTag, gameTags, &error)) return true;
+    hostlog::Write("warn", plugins::CurrentId(), "Hub::Search: " + error);
+    return false;
+}
+std::string HubView() {
+    plugins::GameWork work;
+    return hub::View();
+}
+bool HubListShown() {
+    plugins::GameWork work;
+    return hub::ListShown();
+}
+CScriptArray* HubEntries() {
+    plugins::GameWork work;
+    std::vector<std::string> ids;
+    for (uint64_t id : hub::Entries()) ids.push_back(std::to_string(id));
+    return StringArrayOf(ids);
+}
+bool HubHideEntry(const std::string& id, bool hidden) {
+    plugins::GameWork work;
+    return hub::HideEntry(IdOf(id), hidden);
+}
+void HubSetAuthorButton(const std::string& label) {
+    plugins::GameWork work;
+    hub::SetAuthorButton(label);
+}
+bool HubAuthorButtonClicked() { return hub::AuthorButtonClicked(); }
+CScriptArray* HubThumbnails() {
+    plugins::GameWork work;
+    std::vector<std::string> ids;
+    for (uint64_t id : hub::Thumbnails()) ids.push_back(std::to_string(id));
+    return StringArrayOf(ids);
+}
+bool HubSetEntryBadge(const std::string& id, const std::string& text) {
+    plugins::GameWork work;
+    return hub::SetEntryBadge(IdOf(id), text);
+}
+std::string HubFocused() {
+    plugins::GameWork work;
+    return IdText(hub::Focused());
+}
+std::string HubFocusedAuthor() {
+    plugins::GameWork work;
+    return IdText(hub::FocusedAuthor());
+}
+
+void RegisterWorkshop() {
+    e->SetDefaultNamespace("Workshop");
+    Global("int Find(const string &in text = \"\", const string &in sort = \"top\", int page = 1, int days = 7, "
+           "const array<string>@ withTags = null, const array<string>@ withoutTags = null, bool anyTag = false)",
+           asFUNCTION(WorkshopFind));
+    Global("int FindList(const string &in list, const string &in user = \"\", const string &in sort = \"new\", int page = 1)",
+           asFUNCTION(WorkshopFindList));
+    Global("int FindIds(const array<string>@ ids)", asFUNCTION(WorkshopFindIds));
+    Global("string State(int)", asFUNCTION(WorkshopState));
+    Global("int Count(int)", asFUNCTION(WorkshopCount));
+    Global("int Total(int)", asFUNCTION(WorkshopTotal));
+    Global("string Id(int, int)", asFUNCTION(WorkshopId));
+    Global("void Forget(int)", asFUNCTION(WorkshopForget));
+    Global("string Title(const string &in)", asFUNCTION(WorkshopTitle));
+    Global("string Author(const string &in)", asFUNCTION(WorkshopAuthor));
+    Global("string Description(const string &in)", asFUNCTION(WorkshopDescription));
+    Global("string Tags(const string &in)", asFUNCTION(WorkshopTags));
+    Global("int64 Created(const string &in)", asFUNCTION(WorkshopCreated));
+    Global("int64 Updated(const string &in)", asFUNCTION(WorkshopUpdated));
+    Global("int VotesUp(const string &in)", asFUNCTION(WorkshopVotesUp));
+    Global("int VotesDown(const string &in)", asFUNCTION(WorkshopVotesDown));
+    Global("float Score(const string &in)", asFUNCTION(WorkshopScore));
+    Global("int64 Plays(const string &in)", asFUNCTION(WorkshopPlays));
+    Global("int64 Subscribers(const string &in)", asFUNCTION(WorkshopSubscribers));
+    Global("int64 Favorites(const string &in)", asFUNCTION(WorkshopFavorites));
+    Global("int64 Size(const string &in)", asFUNCTION(WorkshopSize));
+    Global("string Image(const string &in)", asFUNCTION(WorkshopImage));
+    Global("string Name(const string &in)", asFUNCTION(WorkshopName));
+    Global("string Me()", asFUNCTION(WorkshopMe));
+    Global("double MyBest(const string &in)", asFUNCTION(WorkshopMyBest));
+    Global("int MyMedal(const string &in)", asFUNCTION(WorkshopMyMedal));
+    Global("array<string>@ Finished()", asFUNCTION(WorkshopFinished));
+    Global("int MyRank(const string &in)", asFUNCTION(WorkshopMyRank));
+    Global("int Players(const string &in)", asFUNCTION(WorkshopPlayers));
+    e->SetDefaultNamespace("Hub");
+    Global("bool Shown()", asFUNCTION(HubShown));
+    Global("bool Search(const string &in text = \"\", const string &in sort = \"top\", int days = 7, const string &in author = \"\", "
+           "const array<string>@ withTags = null, bool anyTag = false, bool gameTags = true, bool show = true)",
+           asFUNCTION(HubSearch));
+    Global("bool ListShown()", asFUNCTION(HubListShown));
+    Global("string View()", asFUNCTION(HubView));
+    Global("array<string>@ Entries()", asFUNCTION(HubEntries));
+    Global("bool HideEntry(const string &in, bool)", asFUNCTION(HubHideEntry));
+    Global("array<string>@ Thumbnails()", asFUNCTION(HubThumbnails));
+    Global("void SetAuthorButton(const string &in label)", asFUNCTION(HubSetAuthorButton));
+    Global("bool AuthorButtonClicked()", asFUNCTION(HubAuthorButtonClicked));
+    Global("bool SetEntryBadge(const string &in id, const string &in text)", asFUNCTION(HubSetEntryBadge));
+    Global("string Focused()", asFUNCTION(HubFocused));
+    Global("string FocusedAuthor()", asFUNCTION(HubFocusedAuthor));
+}
+
 void RegisterGhosts() {
     e->SetDefaultNamespace("Ghosts");
     Global("bool Load(const string &in leaderboard = \"\", int count = 25)", asFUNCTION(GhostsLoad));
@@ -1349,6 +1536,7 @@ void Register(asIScriptEngine* engine) {
     RegisterUi();
     RegisterInput();
     RegisterGhosts();
+    RegisterWorkshop();
     RegisterRace();
     RegisterHud();
     RegisterEditor();

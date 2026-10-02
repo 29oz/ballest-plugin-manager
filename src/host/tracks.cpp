@@ -272,24 +272,22 @@ std::wstring PreviewFile(uint64_t id) { return hostlog::DataDir() + L"\\cache\\p
 bool Exists(const std::wstring& path) { return GetFileAttributesW(path.c_str()) != INVALID_FILE_ATTRIBUTES; }
 }  // namespace
 
-std::string ResultImage(size_t index) {
-    if (index >= gResults.size()) return "";
-    const steam::Item& item = gResults[index];
+std::string PreviewImage(uint64_t id, uint64_t preview) {
+    if (!id) return "";
     // The game's own cache of workshop previews: <id>_<hash>_<size>.img, JPEG (measured).
     const std::wstring saved = hostlog::DataDir() + L"\\..\\HubPreviewCache\\";
     WIN32_FIND_DATAW fd;
-    HANDLE h = FindFirstFileW((saved + std::to_wstring(item.id) + L"_*.img").c_str(), &fd);
+    HANDLE h = FindFirstFileW((saved + std::to_wstring(id) + L"_*.img").c_str(), &fd);
     if (h != INVALID_HANDLE_VALUE) {
         FindClose(h);
         const std::wstring full = saved + fd.cFileName;
         return eng::Narrow(full.c_str(), static_cast<int>(full.size()));
     }
-    const std::wstring mine = PreviewFile(item.id);
+    const std::wstring mine = PreviewFile(id);
     if (Exists(mine)) return eng::Narrow(mine.c_str(), static_cast<int>(mine.size()));
-    if (!item.preview || gPreviewAsked[item.id]) return "";
-    gPreviewAsked[item.id] = true;
-    const uint64_t id = item.id;
-    steam::DownloadFile(item.preview, [id](bool ok, std::string bytes) {
+    if (!preview || gPreviewAsked[id]) return "";
+    gPreviewAsked[id] = true;
+    steam::DownloadFile(preview, [id](bool ok, std::string bytes) {
         if (!ok || bytes.empty()) return;
         const std::wstring dir = hostlog::DataDir() + L"\\cache";
         CreateDirectoryW(dir.c_str(), nullptr);
@@ -300,6 +298,11 @@ std::string ResultImage(size_t index) {
         }
     });
     return "";
+}
+
+std::string ResultImage(size_t index) {
+    if (index >= gResults.size()) return "";
+    return PreviewImage(gResults[index].id, gResults[index].preview);
 }
 const std::vector<steam::Item>& Results() { return gResults; }
 int Total() { return gTotal; }

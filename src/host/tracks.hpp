@@ -39,6 +39,8 @@ int Total();
 // JPEG), or one downloaded here (Saved\PluginManager\cache\previews\<id>.jpg); "" until there is one (asking for it
 // starts the download).
 std::string ResultImage(size_t index);
+// The same for any workshop item, by id and its preview's file handle (0 if unknown: then only cached pictures).
+std::string PreviewImage(uint64_t id, uint64_t preview);
 
 // Opens a workshop track by id, downloading it first if needed; OpenState tells how it is going.
 bool OpenWorkshop(uint64_t id);

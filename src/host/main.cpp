@@ -12,6 +12,8 @@
 #include "ghosts.hpp"
 #include "steam.hpp"
 #include "tracks.hpp"
+#include "workshop.hpp"
+#include "hub.hpp"
 #include "cosmetics.hpp"
 #include "editor.hpp"
 #include "engine.hpp"
@@ -105,6 +107,8 @@ void HostFrame(float dt) {
     draw::Frame();
     postprocess::Frame();
     tracks::Frame();
+    workshop::Frame();
+    hub::Frame();
     hud::Frame();
     replay::Frame(dt);
     cosmetics::Frame();

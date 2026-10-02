@@ -11,6 +11,7 @@
 #include <set>
 
 #include "log.hpp"
+#include "race.hpp"
 
 using eng::Obj;
 
@@ -52,7 +53,10 @@ void UpdateCursor(Obj controller) {
 
 void UpdateTyping(Obj controller) {
     Obj widgets = eng::FindCdo("WidgetBlueprintLibrary");
-    Obj typing = eng::Get(gTypingWidget);
+    // Only on a track, where the game's keys (R, Backspace...) would act on what's typed. The menus route keys to
+    // the focused box themselves, and switching their input mode there made the first click after typing go
+    // nowhere (the user's report: leaving the hub's search took two clicks).
+    Obj typing = race::OnTrack() ? eng::Get(gTypingWidget) : nullptr;
     if (!widgets || (typing != nullptr) == gTypingMode) return;
     if (typing) {
         // No mouse lock, input not flushed.

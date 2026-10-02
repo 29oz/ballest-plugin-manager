@@ -1201,6 +1201,206 @@ void RegisterTracks()
                            Is(Tracks::ResultImage(99999) == "", "Tracks::ResultImage past the end not empty"), Is(Tracks::ResultTitle(99999) == "", "Tracks::ResultTitle past the end not empty")};
         return All(c);
     }, 30);
+    Add("tracks", "Workshop find newest", "Workshop::Find,Workshop::State,Workshop::Count,Workshop::Total,Workshop::Id,Workshop::Title,Workshop::Author,Workshop::Description,Workshop::Tags,Workshop::Created,Workshop::Updated,Workshop::VotesUp,Workshop::VotesDown,Workshop::Score,Workshop::Plays,Workshop::Subscribers,Workshop::Favorites,Workshop::Size,Workshop::Image,Workshop::Forget", function() {
+        if (step == 0)
+        {
+            id1 = Workshop::Find("", "new");
+            if (id1 < 0)
+                return "Workshop::Find answered -1";
+            step = 1;
+            return WAIT;
+        }
+        string state = Workshop::State(id1);
+        if (state.findFirst("error") == 0)
+            return "Workshop::State " + state;
+        if (state != "done")
+            return WAIT;
+        if (Workshop::Count(id1) == 0)
+            return "Workshop::Count: no maps";
+        string id = Workshop::Id(id1, 0);
+        if (step == 1)
+        {
+            s1 = id;
+            step = 2;
+        }
+        // The preview downloads after the first ask.
+        if (Workshop::Image(s1) == "" && Elapsed() < 15)
+            return WAIT;
+        array<string> c = {Is(Workshop::Count(id1) == 50, "Workshop::Count " + Workshop::Count(id1) + " on a first page of 50"),
+                           Is(Workshop::Total(id1) >= Workshop::Count(id1), "Workshop::Total " + Workshop::Total(id1)),
+                           Is(parseInt(id) > 0, "Workshop::Id(0) '" + id + "'"), Is(Workshop::Id(id1, 999) == "", "Workshop::Id past the end not empty"),
+                           Is(Workshop::Title(id) != "", "Workshop::Title empty"), Is(parseInt(Workshop::Author(id)) > 0, "Workshop::Author '" + Workshop::Author(id) + "'"),
+                           Is(Workshop::Description(id).length() < 8000, "Workshop::Description too long"),
+                           Is(Workshop::Tags(id).length() < 1025, "Workshop::Tags too long"),
+                           Is(Workshop::Created(id) > 1700000000, "Workshop::Created " + Workshop::Created(id)),
+                           Is(Workshop::Updated(id) >= Workshop::Created(id), "Workshop::Updated " + Workshop::Updated(id) + " before Created"),
+                           Is(Workshop::Created(Workshop::Id(id1, 0)) >= Workshop::Created(Workshop::Id(id1, Workshop::Count(id1) - 1)), "Workshop::Find new: not newest first"),
+                           Is(Workshop::VotesUp(id) >= 0 && Workshop::VotesDown(id) >= 0, "Workshop::VotesUp/VotesDown negative"),
+                           Is(Workshop::Score(id) >= 0 && Workshop::Score(id) <= 1, "Workshop::Score " + Workshop::Score(id)),
+                           Is(Workshop::Plays(id) >= 0 && Workshop::Subscribers(id) >= 0 && Workshop::Favorites(id) >= 0, "Workshop::Plays/Subscribers/Favorites negative"),
+                           Is(Workshop::Size(id) > 0, "Workshop::Size " + Workshop::Size(id)),
+                           Is(Workshop::Image(s1) != "", "Workshop::Image still empty after 15 s"),
+                           Is(Workshop::Title("1") == "", "Workshop::Title of an unknown map not empty")};
+        Workshop::Forget(id1);
+        c.insertLast(Is(Workshop::State(id1) == "", "Workshop::Forget: State still '" + Workshop::State(id1) + "'"));
+        c.insertLast(Is(Workshop::Title(id) != "", "Workshop::Forget also forgot the map"));
+        return All(c);
+    }, 40);
+    Add("tracks", "Workshop sorts and tags", "Workshop::Find,Workshop::State,Workshop::Count,Workshop::Tags", function() {
+        if (step == 0)
+        {
+            if (Workshop::Find("", "no-such-sort") != -1)
+                return "Workshop::Find with an unknown sort didn't answer -1";
+            array<string> with = {"beginner"}, none;
+            id1 = Workshop::Find("", "top", 1, 7, with, none);
+            array<string> without = {"beginner"};
+            id2 = Workshop::Find("", "trending", 1, 30, none, without);
+            id3 = Workshop::Find("sky", "relevance");
+            step = 1;
+            return WAIT;
+        }
+        for (int q = 0; q < 3; q++)
+        {
+            int query = q == 0 ? id1 : q == 1 ? id2 : id3;
+            string state = Workshop::State(query);
+            if (state.findFirst("error") == 0)
+                return "Workshop::State " + state;
+            if (state != "done")
+                return WAIT;
+        }
+        string bad = "";
+        for (int i = 0; i < Workshop::Count(id1); i++)
+            if (Workshop::Tags(Workshop::Id(id1, i)).findFirst("beginner") < 0)
+                bad = "with beginner: '" + Workshop::Tags(Workshop::Id(id1, i)) + "'";
+        for (int i = 0; i < Workshop::Count(id2); i++)
+            if (Workshop::Tags(Workshop::Id(id2, i)).findFirst("beginner") >= 0)
+                bad = "without beginner: '" + Workshop::Tags(Workshop::Id(id2, i)) + "'";
+        array<string> c = {Is(Workshop::Count(id1) > 0, "Workshop::Find top with beginner: no maps"), Is(Workshop::Count(id2) > 0, "Workshop::Find trending: no maps"),
+                           Is(Workshop::Count(id3) > 0, "Workshop::Find relevance 'sky': no maps"), Is(bad == "", "Workshop::Find tags " + bad)};
+        Workshop::Forget(id1);
+        Workshop::Forget(id2);
+        Workshop::Forget(id3);
+        return All(c);
+    }, 40);
+    Add("tracks", "Workshop lists, ids and names", "Workshop::FindList,Workshop::FindIds,Workshop::Me,Workshop::Name,Workshop::Author", function() {
+        if (step == 0)
+        {
+            id1 = Workshop::Find("", "top");
+            step = 1;
+            return WAIT;
+        }
+        if (step == 1)
+        {
+            if (Workshop::State(id1) != "done")
+                return Workshop::State(id1).findFirst("error") == 0 ? "Workshop::State " + Workshop::State(id1) : WAIT;
+            s1 = Workshop::Id(id1, 0);
+            if (Workshop::FindList("no-such-list") != -1)
+                return "Workshop::FindList with an unknown list didn't answer -1";
+            id2 = Workshop::FindList("published", Workshop::Author(s1));
+            array<string> ids = {s1};
+            id3 = Workshop::FindIds(ids);
+            step = 2;
+            return WAIT;
+        }
+        if (Workshop::State(id2) != "done" || Workshop::State(id3) != "done")
+        {
+            if (Workshop::State(id2).findFirst("error") == 0 || Workshop::State(id3).findFirst("error") == 0)
+                return "Workshop::State " + Workshop::State(id2) + " / " + Workshop::State(id3);
+            return WAIT;
+        }
+        // Steam has the author's name a moment after the first ask.
+        if (Workshop::Name(Workshop::Author(s1)) == "" && Elapsed() < 20)
+            return WAIT;
+        string author = Workshop::Author(s1), bad = "";
+        bool found = false;
+        for (int i = 0; i < Workshop::Count(id2); i++)
+        {
+            if (Workshop::Author(Workshop::Id(id2, i)) != author)
+                bad = Workshop::Id(id2, i) + " by " + Workshop::Author(Workshop::Id(id2, i));
+            if (Workshop::Id(id2, i) == s1)
+                found = true;
+        }
+        array<string> c = {Is(parseInt(Workshop::Me()) > 0, "Workshop::Me '" + Workshop::Me() + "'"),
+                           Is(bad == "", "Workshop::FindList published: a map " + bad), Is(found || Workshop::Total(id2) > 50, "Workshop::FindList published: the author's map isn't there"),
+                           Is(Workshop::Count(id3) == 1 && Workshop::Id(id3, 0) == s1, "Workshop::FindIds: " + Workshop::Count(id3) + " maps"),
+                           Is(Workshop::Name(author) != "", "Workshop::Name of the author still empty after 20 s"),
+                           Is(Workshop::Name(Workshop::Me()) != "", "Workshop::Name of yourself empty")};
+        Workshop::Forget(id1);
+        Workshop::Forget(id2);
+        Workshop::Forget(id3);
+        return All(c);
+    }, 40);
+    Add("tracks", "Workshop progress", "Workshop::Finished,Workshop::MyMedal,Workshop::MyBest,Workshop::MyRank,Workshop::Players", function() {
+        array<string>@ finished = Workshop::Finished();
+        if (finished.length() == 0)
+            return "Workshop::Finished: no finished workshop maps in this save (finish one to test this)";
+        if (step == 0)
+        {
+            id1 = Workshop::FindIds(finished);
+            s1 = finished[0];
+            step = 1;
+            return WAIT;
+        }
+        if (Workshop::State(id1) != "done")
+            return Workshop::State(id1).findFirst("error") == 0 ? "Workshop::State " + Workshop::State(id1) : WAIT;
+        if (Workshop::MyRank(s1) == -1)
+            return WAIT;
+        int medal = Workshop::MyMedal(s1);
+        array<string> c = {Is(medal >= 0 && medal <= 4, "Workshop::MyMedal " + medal), Is(Workshop::MyMedal("1") == -1, "Workshop::MyMedal of an unknown map " + Workshop::MyMedal("1")),
+                           Is(Workshop::MyBest(s1) > 0, "Workshop::MyBest " + Workshop::MyBest(s1)), Is(Workshop::MyBest("1") == 0, "Workshop::MyBest of an unknown map"),
+                           Is(Workshop::MyRank(s1) > 0, "Workshop::MyRank " + Workshop::MyRank(s1) + " on a finished map"),
+                           Is(Workshop::Players(s1) >= Workshop::MyRank(s1), "Workshop::Players " + Workshop::Players(s1) + " below MyRank " + Workshop::MyRank(s1))};
+        Log::Info("workshop progress: " + finished.length() + " finished; " + s1 + " medal " + medal + " best " + Workshop::MyBest(s1) + " rank " +
+                  Workshop::MyRank(s1) + " of " + Workshop::Players(s1));
+        Workshop::Forget(id1);
+        return All(c);
+    }, 40);
+    Add("tracks", "Hub off screen", "Hub::Shown,Hub::Entries,Hub::Focused,Hub::FocusedAuthor,Hub::HideEntry", function() {
+        // The run starts on the main menu with the play page showing the game's own tracks, not the hub.
+        array<string> c = {Is(!Hub::Shown(), "Hub::Shown true on the main menu"),
+                           Is(!Hub::HideEntry("1", true), "Hub::HideEntry of a map not on the list answered true"),
+                           Is(Hub::Focused() == "" || parseInt(Hub::Focused()) > 0, "Hub::Focused '" + Hub::Focused() + "'"),
+                           Is(Hub::FocusedAuthor() == "" || parseInt(Hub::FocusedAuthor()) > 0, "Hub::FocusedAuthor '" + Hub::FocusedAuthor() + "'"),
+                           Is(Hub::Entries().length() <= 50, "Hub::Entries " + Hub::Entries().length())};
+        return All(c);
+    });
+    Add("tracks", "Hub search", "Hub::Search,Hub::Shown,Hub::Entries,Hub::HideEntry,Window.DockInHub", function() {
+        // Opens the hub (the play page's workshop side) the way its own tab does, then searches in it.
+        if (step == 0)
+        {
+            Console::Run("hubopen");
+            step = 1;
+            return WAIT;
+        }
+        if (step == 1)
+        {
+            if (!Hub::Shown())
+                return Elapsed() > 15 ? "Hub::Shown still false after opening the hub" : WAIT;
+            @win = UI::CreateWindow();
+            win.DockInHub();
+            win.AddText("api tests", 16);
+            if (!Hub::Search("sky", "relevance"))
+                return "Hub::Search answered false";
+            step = 2;
+            t0 = Host::Time();
+            return WAIT;
+        }
+        array<string>@ ids = Hub::Entries();
+        if (ids.length() == 0)
+            return Elapsed() > 15 ? "Hub::Entries empty 15 s after the search" : WAIT;
+        if (step == 2)
+        {
+            if (!Hub::HideEntry(ids[0], true))
+                return "Hub::HideEntry answered false for a map on the list";
+            s1 = ids[0];
+            step = 3;
+            return WAIT;
+        }
+        bool stillListed = Hub::Entries().find(s1) >= 0;
+        Hub::HideEntry(s1, false);
+        win.visible = false;
+        return Is(stillListed, "Hub::Entries left out a map Hub::HideEntry hid");
+    }, 40);
     Add("tracks", "Ghosts load a leaderboard", "Ghosts::Load,Ghosts::State,Ghosts::Leaderboard,Ghosts::Entries,Ghosts::WithoutReplay,Ghosts::Count", function() {
         if (level == "")
             return "no level from Tracks::Official";

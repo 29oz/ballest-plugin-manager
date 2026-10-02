@@ -11,6 +11,7 @@
 
 #include "cosmetics.hpp"
 #include "editor.hpp"
+#include "hub.hpp"
 #include "game.hpp"
 #include "input.hpp"
 #include "log.hpp"
@@ -23,6 +24,10 @@ using eng::Obj;
 namespace w = ui::widgets;
 
 namespace ui {
+namespace {
+const ui::Color kClearIdle{0.7f, 0.7f, 0.7f, 1};    // a text box's x when the pointer isn't on it
+}  // namespace
+
 namespace {
 
 std::vector<std::unique_ptr<Window>> gWindows;
@@ -207,9 +212,49 @@ Obj BuildWidget(Obj tree, Widget& item) {
             w::WriteSlateColor(input, {"WidgetStyle", "BackgroundColor"}, kInputBackground);
             w::SetFontSize(input, item.size, {"WidgetStyle", "TextStyle", "Font"});
             if (!item.text.empty()) w::SetHintText(input, item.text);
-            w::AddChild(box, input);
             item.main = eng::MakeWeak(input);
+            Obj over = item.clearButton ? w::Spawn("Overlay", tree) : nullptr;
+            Obj x = over ? w::Spawn("Button", tree) : nullptr, mark = x ? w::Spawn("TextBlock", tree) : nullptr;
+            if (mark) {
+                // an x at the box's right end, drawn as text on a transparent button
+                Obj inputSlot = eng::Call(over, "AddChildToOverlay", input).ReturnObj();
+                if (inputSlot) {
+                    eng::Call(inputSlot, "SetHorizontalAlignment", w::kAlignFill);
+                    eng::Call(inputSlot, "SetVerticalAlignment", w::kAlignFill);
+                }
+                w::Unfocusable(x);
+                w::Transparent(x);
+                w::SetFontSize(mark, item.size + 2);
+                w::SetText(mark, "x");
+                w::SetTextColor(mark, kClearIdle);
+                // a rounded patch behind the x that lights up under the pointer, and the hand cursor
+                Obj patch = w::Spawn("Border", tree);
+                if (patch) {
+                    w::RoundCorners(patch, 9);
+                    eng::Call(patch, "SetBrushColor", Color{1, 1, 1, 0});
+                    eng::Call(patch, "SetPadding", w::Margin{7, 0, 7, 1});
+                    w::AddChild(patch, mark);
+                    w::AddChild(x, patch);
+                } else {
+                    w::AddChild(x, mark);
+                }
+                eng::Call(x, "SetCursor", uint8_t{9});             // EMouseCursor::Hand
+                item.iconB = eng::MakeWeak(mark);
+                item.iconC = eng::MakeWeak(patch);
+                w::AddToOverlay(over, x, w::kAlignEnd, w::kAlignCenter, w::Margin{0, 0, 4, 0});
+                w::SetVisibility(x, item.typed.empty() ? w::kCollapsed : 0);
+                item.iconA = eng::MakeWeak(x);
+                w::AddChild(box, over);
+            } else {
+                w::AddChild(box, input);
+            }
+            // A rebuild (the window's layout changed: a dropdown got new options, say) keeps what was typed and the
+            // typing itself: the text goes back in and the new box takes the keyboard focus the old one had.
             if (!item.pendingValue.empty()) item.valuePending = true;       // shown again after a rebuild
+            if (item.focused) {
+                item.focusRequested = true;
+                item.focusAttempts = 0;
+            }
             return box;
         }
         case Kind::CheckBox: {
@@ -269,9 +314,9 @@ void Forget(Window& win) {
 
 void Build(Window& win) {
     Obj host = nullptr, tree = nullptr, canvas = nullptr, dock = nullptr;
-    if (win.dock == Dock::EditorDetails) {
-        // A section of the editor's details panel: built into that panel's own widget tree.
-        dock = editor::DetailsContainer();
+    if (win.dock == Dock::EditorDetails || win.dock == Dock::Hub) {
+        // A section of the editor's details panel, or a row of the track hub: built into that panel's own widget tree.
+        dock = win.dock == Dock::Hub ? hub::DockPanel() : editor::DetailsContainer();
         if (!dock) return;
         tree = eng::OuterOf(dock);
     } else if (!w::NewScreen(game::PlayerController(), &host, &tree, &canvas)) {
@@ -283,7 +328,7 @@ void Build(Window& win) {
     if (dock) {
         Obj slot = eng::Call(dock, "AddChildToVerticalBox", border).ReturnObj();
         if (!slot) return;
-        eng::Call(slot, "SetPadding", w::Margin{0, 10, 0, 0});
+        eng::Call(slot, "SetPadding", win.dock == Dock::Hub ? w::Margin{0, 0, 0, 8} : w::Margin{0, 10, 0, 0});
         host = border;                          // what is removed when the section is rebuilt
     } else if (sized) {
         const double marginX = (1.0 - win.screenWidth) / 2, marginY = (1.0 - win.screenHeight) / 2;
@@ -639,7 +684,28 @@ void Sync(Widget& item) {
                 item.readOnlyPending = false;
             }
             item.focused = eng::Call(main, "HasKeyboardFocus").ReturnBool();
-            if (item.focused) item.typed = w::ReadText(main);      // live, for filtering as you type
+            if (item.focused) {
+                item.typed = w::ReadText(main);         // live, for filtering as you type
+                item.pendingValue = item.typed;         // and what a rebuild puts back
+            }
+            if (Obj x = eng::Get(item.iconA)) {
+                // the x: shown while there is text, a click empties the box (a press ending over it)
+                w::SetVisibility(x, item.typed.empty() ? w::kCollapsed : 0);
+                const bool pressed = eng::Call(x, "IsPressed").ReturnBool();
+                const bool over = eng::Call(x, "IsHovered").ReturnBool();
+                if (over != item.hovered) {
+                    w::SetTextColor(eng::Get(item.iconB), over ? Color{1, 1, 1, 1} : kClearIdle);
+                    if (Obj patch = eng::Get(item.iconC)) eng::Call(patch, "SetBrushColor", Color{1, 1, 1, over ? 0.18f : 0.0f});
+                    item.hovered = over;
+                }
+                if (item.wasPressed && !pressed && over) {
+                    w::SetText(main, "");
+                    item.typed.clear();
+                    item.pendingValue.clear();
+                    item.clearedPending = true;
+                }
+                item.wasPressed = pressed;
+            }
             // Focus can only be taken once the box is on screen, so it is asked for until it sticks.
             if (item.focusRequested) {
                 if (item.focused || ++item.focusAttempts > kFocusAttempts) item.focusRequested = false;
@@ -848,7 +914,8 @@ void Frame() {
         // Built in an earlier map: those widgets went with it. Forgotten without being touched.
         if (win.host.o && win.generation != game::Generation()) Forget(win);
         // Docked into a panel that has been replaced (the editor was reopened): build it again in the new one.
-        if (win.dock == Dock::EditorDetails && eng::Get(win.host) && eng::Get(win.dockedIn) != editor::DetailsContainer()) {
+        if (win.dock != Dock::Screen && eng::Get(win.host) &&
+            eng::Get(win.dockedIn) != (win.dock == Dock::Hub ? hub::DockPanel() : editor::DetailsContainer())) {
             eng::Call(eng::Get(win.host), "RemoveFromParent");
             Forget(win);
         }
@@ -897,6 +964,15 @@ void Frame() {
     }
     game::SetTypingWidget(typingWidget);
     gSimulatedSlider = -1;
+    // Rows docked in the hub take height from the hub's pages, so the hub keeps its size on screen.
+    double hubRows = 0;
+    bool docked = false;
+    for (auto& winPtr : gWindows)
+        if (winPtr->dock == Dock::Hub && eng::Get(winPtr->border)) {
+            docked = true;
+            if (winPtr->visible) hubRows += eng::Call(eng::Get(winPtr->border), "GetDesiredSize").ReturnAs<w::Vec2>({0, 0}).y + 8;
+        }
+    if (docked) hub::SetDockedHeight(hubRows);
 }
 
 bool Typing() { return gTyping; }

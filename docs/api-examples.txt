@@ -767,6 +767,15 @@ section.DockInEditorDetails();
 section.SetBackground(0, 0, 0, 0);
 section.AddText("rotated copy", 18);
 
+== UI::Window.DockInHub
+Makes the window a row of the game's track hub, under the hub's header and its page row, shown with the hub. The hub's
+pages get shorter by the row's height, so the hub keeps its size. Call it before adding widgets. `SetAnchor`,
+`SetOffset` and `movable` don't apply to a docked window. Requires host 0.23.0.
+--
+UI::Window@ row = UI::CreateWindow();
+row.DockInHub();
+UI::TextInput@ search = row.AddTextInput(0, "search maps", 17);
+
 == UI::Window.StartHeader
 Widgets added after this go into rows above the views, shown whichever view is open, until the next `StartView`.
 Use it for tabs or a toolbar shared by every view.
@@ -1064,6 +1073,19 @@ angleInput.value = "180";
 --
 // A number box that keeps showing its value
 angleInput.clearOnSubmit = false;
+
+== UI::TextInput.clearButton
+**Write only.** Puts an x at the box's right end while it holds text; clicking it empties the box (`Cleared()` then
+says so). Set it straight after `AddTextInput`, before the window is shown. Requires host 0.23.0.
+--
+@search = row.AddTextInput(0, "search maps");
+search.clearButton = true;
+
+== UI::TextInput.Cleared
+True once after the player emptied the box with its x (`clearButton`). Reading it clears it. Requires host 0.23.0.
+--
+if (search.Cleared())
+    ShowEverything();
 
 == UI::TextInput.readOnly
 **Write only.** Whether the player can change the text (the default) or only select and copy it. Requires host
@@ -2184,6 +2206,267 @@ Tracks::OpenWorkshop(Tracks::ResultId(0));
 --
 if (Tracks::OpenState().findFirst("error") == 0)
     statusText.text = Tracks::OpenState();
+
+@@ Workshop
+The workshop's maps, searched and listed the ways Steam can: by text, with any of Steam's rankings, by tags, and a
+player's own lists (played, favourites, subscriptions, likes, published). Every map a query returns is kept, so the
+functions that take a map's id (Title, Author, Plays, ...) answer for any map a query has returned. Also who made a map
+and this player's progress on it. Queries run in the background: start one, then read `State` until it's `"done"`.
+Everything here needs host 0.23.0.
+
+== Workshop::Find
+Starts a search of every map: `text` to match (in a title, description or tag; `""` for every map), `sort` one of
+`"relevance"` (needs text), `"top"`, `"trending"` (over the last `days` days), `"new"`, `"updated"`, `"played"`,
+`"subscribed"`, `"liked"` or `"unrated"`, then `page` (1-based, 50 maps a page). `withTags` are tags a map needs (all
+of them, or any one with `anyTag`), `withoutTags` tags it mustn't have. Returns the query's number, or -1 (with a
+warning in the log) for an unknown sort or without Steam.
+--
+int newest = Workshop::Find("", "new");
+array<string> with = {"flow"}, without = {"troll"};
+int flowMaps = Workshop::Find("", "top", 1, 7, with, without);
+
+== Workshop::FindList
+Starts a query of one player's list: `"published"`, `"played"`, `"favorited"`, `"subscribed"`, `"liked"` or
+`"disliked"`. `user` is a Steam id (`""`: you, and only your own lists other than published are public to you), `sort`
+one of `"new"`, `"old"`, `"title"`, `"updated"`, `"top"` or `"subscribed"`, 50 maps a page.
+--
+int theirs = Workshop::FindList("published", Workshop::Author(id));
+int mine = Workshop::FindList("played");
+
+== Workshop::FindIds
+Starts a query for these maps by id (up to 50), to read about maps no other query has returned.
+--
+array<string> ids = {"3412345678", "3423456789"};
+int q = Workshop::FindIds(ids);
+
+== Workshop::State
+`"searching"`, `"done"` or `"error: ..."`; `""` for a query that doesn't exist (or was forgotten).
+--
+if (Workshop::State(query) == "done")
+    ShowResults();
+
+== Workshop::Count
+How many maps a finished query returned (this page).
+--
+for (int i = 0; i < Workshop::Count(query); i++)
+    Log::Info(Workshop::Title(Workshop::Id(query, i)));
+
+== Workshop::Total
+How many maps match the query in all, over every page.
+--
+int pages = (Workshop::Total(query) + 49) / 50;
+
+== Workshop::Id
+The id of a map a query returned, by its place in the results.
+--
+string id = Workshop::Id(query, 0);
+
+== Workshop::Forget
+Forgets a query's results (the maps themselves are still known by id). Queries past the 256 newest are forgotten by
+themselves.
+--
+Workshop::Forget(query);
+
+== Workshop::Title
+A map's title; `""` if no query has returned it.
+--
+titleText.text = Workshop::Title(id);
+
+== Workshop::Author
+The Steam id of the player who made a map. Their name is `Workshop::Name`.
+--
+string author = Workshop::Author(id);
+
+== Workshop::Description
+A map's description, as its author wrote it on the workshop.
+--
+descriptionArea.text = Workshop::Description(id);
+
+== Workshop::Tags
+A map's tags, separated by commas, as on Steam (`"map,beginner,flow"`).
+--
+bool flow = Workshop::Tags(id).findFirst("flow") >= 0;
+
+== Workshop::Created
+When a map was published, in seconds since 1970 (UTC).
+--
+int64 age = Workshop::Created(id);
+
+== Workshop::Updated
+When a map was last updated, in seconds since 1970 (UTC).
+--
+bool updated = Workshop::Updated(id) > Workshop::Created(id);
+
+== Workshop::VotesUp
+How many players liked a map.
+--
+Log::Info(Workshop::VotesUp(id) + " likes");
+
+== Workshop::VotesDown
+How many players disliked a map.
+--
+Log::Info(Workshop::VotesDown(id) + " dislikes");
+
+== Workshop::Score
+Steam's rating of a map, 0 to 1, from its likes and dislikes.
+--
+float stars = Workshop::Score(id) * 5;
+
+== Workshop::Plays
+How many times a map has been played (Steam's count of play sessions, the number the game's hub shows).
+--
+Log::Info(Workshop::Plays(id) + " plays");
+
+== Workshop::Subscribers
+How many players have subscribed to a map.
+--
+Log::Info(Workshop::Subscribers(id) + " subscribers");
+
+== Workshop::Favorites
+How many players have a map in their favourites.
+--
+Log::Info(Workshop::Favorites(id) + " favourites");
+
+== Workshop::Size
+The size of a map's file, in bytes.
+--
+Log::Info((Workshop::Size(id) / 1024) + " KB");
+
+== Workshop::Image
+A map's preview picture for `Window.AddImage`: the game's own cached copy, or one downloaded here. `""` until there
+is one; asking starts the download, so ask again a moment later.
+--
+string image = Workshop::Image(id);
+if (image != "")
+    picture.path = image;
+
+== Workshop::Name
+A Steam player's name, by Steam id. `""` while Steam is still being asked (asking starts it); ask again later.
+--
+string name = Workshop::Name(Workshop::Author(id));
+bylineText.text = name == "" ? "" : "by " + name;
+
+== Workshop::Me
+Your own Steam id.
+--
+bool mine = Workshop::Author(id) == Workshop::Me();
+
+== Workshop::MyBest
+Your best time on a map in seconds, from the game's save; 0 if you haven't finished it.
+--
+double best = Workshop::MyBest(id);
+
+== Workshop::MyMedal
+Your medal on a map, from the game's save: -1 if you haven't finished it, else 0 none, 1 bronze, 2 silver, 3 gold,
+4 author.
+--
+bool needsGold = Workshop::MyMedal(id) < 3;
+
+== Workshop::Finished
+The ids of every workshop map the game's save has a time for.
+--
+Log::Info(Workshop::Finished().length() + " workshop maps finished");
+
+== Workshop::MyRank
+Your place on a map's leaderboard: -1 while it's being looked up (asking starts it, for a map a query has returned),
+0 if you have no time on it, else your rank.
+--
+int rank = Workshop::MyRank(id);
+if (rank > 0)
+    rankText.text = "#" + rank + " of " + Workshop::Players(id);
+
+== Workshop::Players
+How many players have a time on a map's leaderboard; 0 until `Workshop::MyRank` has looked it up.
+--
+int players = Workshop::Players(id);
+
+@@ Hub
+The game's track hub (the workshop side of the play page), driven from a plugin: searches shown in the hub's own
+list, the maps on its list, and the map its info panel shows. Put a plugin's own controls in the hub with
+`Window.DockInHub`. Everything here needs host 0.23.0.
+
+== Hub::Shown
+Whether the track hub is on screen.
+--
+row.visible = Hub::Shown();
+
+== Hub::Search
+Shows a search in the hub's own list, made the way the game makes its own searches, and switches the hub to its list
+(with `show` false the list gets the results and the hub stays on the page it's on; requires host 0.23.0).
+`text` to search for (map titles, descriptions and tags), `sort` one of the game's `"relevance"`, `"top"`,
+`"trending"` (over `days` days), `"new"`, `"oldest"`, `"title"`, `"updated"`, or Steam's `"played"`, `"subscribed"`,
+`"liked"` (searches of every map). `author` is a Steam id for one player's maps (`""`: anyone). `withTags` are Steam
+tags a map needs (all, or any one with `anyTag`); with `gameTags`, the tags picked in the hub's own filter panel apply
+too. False (with a warning in the log) if the hub isn't there.
+--
+if (search.Submitted())
+    Hub::Search(search.text, "top");
+
+== Hub::ListShown
+Whether a list of maps is on screen: the hub's list or its Subscribed page (false on the hub's Home, whose tiles aren't
+a list). Requires host 0.23.0.
+--
+if (filtering && !Hub::ListShown())
+    status.text = "the filter works on the list and Subscribed pages";
+
+== Hub::View
+The hub's page on screen: `"home"`, `"list"` or `"subscribed"`; `""` when the hub isn't. Requires host 0.23.0.
+--
+// clearing a search keeps the hub where it is
+Hub::Search("", "top", 7, "", null, false, true, Hub::View() == "list");
+
+== Hub::Thumbnails
+The ids of every map whose thumbnail is on screen: the list's (or Subscribed's) entries, or on Home its tiles. A map
+in several of Home's rows is listed once. Requires host 0.23.0.
+--
+array<string>@ ids = Hub::Thumbnails();
+
+== Hub::SetEntryBadge
+A small badge on every on-screen thumbnail of a map: a person icon and `text` (top left on Home's tiles, at the right
+end of the list's rows); `""` hides it. The game reuses its widgets for other maps, so set badges again whenever
+`Hub::Thumbnails` changes (every few tenths of a second is fine). Requires host 0.23.0.
+--
+array<string>@ ids = Hub::Thumbnails();
+for (uint i = 0; i < ids.length(); i++)
+    Hub::SetEntryBadge(ids[i], "" + Workshop::Subscribers(ids[i]));
+
+== Hub::SetAuthorButton
+A button right after the author's name in the hub's info panel, labelled `label`; `""` removes it. Requires host
+0.23.0.
+--
+Hub::SetAuthorButton("more by this author");
+
+== Hub::AuthorButtonClicked
+True once after the info panel's author button (`Hub::SetAuthorButton`) was clicked. Reading it clears it. Requires
+host 0.23.0.
+--
+if (Hub::AuthorButtonClicked())
+    ShowMapsBy(Hub::FocusedAuthor());
+
+== Hub::Entries
+The ids of the maps the list on screen (the hub's list or its Subscribed page) shows on this page, in order (with any
+hidden by `Hub::HideEntry`); none on the hub's Home.
+--
+array<string>@ ids = Hub::Entries();
+
+== Hub::HideEntry
+Hides a map on the hub's list (`true`) or shows it again. The game shows its entries again when it fills the list
+with new results, so hide them again then (when `Hub::Entries` changes). False if that map isn't on the list.
+--
+array<string>@ ids = Hub::Entries();
+for (uint i = 0; i < ids.length(); i++)
+    Hub::HideEntry(ids[i], Workshop::MyMedal(ids[i]) >= 0);     // only maps not finished yet
+
+== Hub::Focused
+The id of the map the hub's info panel shows; `""` for none.
+--
+string id = Hub::Focused();
+
+== Hub::FocusedAuthor
+The Steam id of whoever made the map the hub's info panel shows; `""` for none.
+--
+if (moreButton.Clicked())
+    Hub::Search("", "new", 7, Hub::FocusedAuthor());
 
 @@ Draw
 Shapes a plugin places in the world: tubes along a path and balls, in one colour, glowing or not. They have no

@@ -8,6 +8,7 @@
 #pragma once
 #include <cstdint>
 #include <cstring>
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -75,6 +76,11 @@ bool ReadBytes(Obj o, const std::string& name, void* out, size_t size);
 bool WriteBytes(Obj o, const std::string& name, const void* in, size_t size);
 std::vector<Obj> ReadObjArray(Obj o, const std::string& name);    // TArray<UObject*>
 bool ReadBool(Obj o, const std::string& name, bool* out);         // plain and bitfield bools
+// Every entry of a TMap property, as pointers to its key and value (valid this frame only). The key's and value's
+// sizes are read from the map's properties; their alignments are the caller's (8 for int64 keys and structs holding
+// pointers, 1 for bytes). False if the property isn't a map or its memory doesn't look like one.
+bool ForEachMapEntry(Obj o, const std::string& name, int keyAlign, int valueAlign,
+                     const std::function<void(const uint8_t* key, const uint8_t* value)>& f);
 bool WriteBool(Obj o, const std::string& name, bool value);
 
 // --- functions -----------------------------------------------------------------------------------------------------

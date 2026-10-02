@@ -102,11 +102,24 @@ def click_when_there(label, timeout=5):
 
 
 def replay_time():
+    t, length, _ = replay_time_at()
+    return t, length
+
+
+def stamp(line):
+    """The host's own time of a log line ([hh:mm:ss.mmm]), in seconds; None if it has none."""
+    m = re.match(r"\[(\d+):(\d+):([\d.]+)\]", line or "")
+    return int(m.group(1)) * 3600 + int(m.group(2)) * 60 + float(m.group(3)) if m else None
+
+
+def replay_time_at():
+    """The replay's time, its length, and when the host read it (the command round trip takes about a second, so
+    rates are timed by the host's log, not by this script's clock)."""
     c = Cursor()
     command("replaytime")
     line = c.wait(r"test: replay time", 5)
     m = re.search(r"replay time ([\d.]+) of ([\d.-]+)", line or "")
-    return (float(m.group(1)), float(m.group(2))) if m else (None, None)
+    return (float(m.group(1)), float(m.group(2)), stamp(line)) if m else (None, None, None)
 
 
 def screenshot(name):
@@ -288,15 +301,19 @@ def replay_manager():
     c = Cursor()
     command("select .1x 4")
     check("speed dropdown sets 2x", c.wait(r"\[replay-manager\] speed 2x", 5))
-    a, _ = replay_time()
+    a, _, at = replay_time_at()
     time.sleep(3)
-    b, _ = replay_time()
-    rate = (b - a) / 3 if a is not None and b is not None else 0
-    check("2x plays at about twice real time", 1.6 < rate < 2.4 or b < a, f"{a} -> {b}, rate {rate:.2f}")
+    b, _, bt = replay_time_at()
+    rate = (b - a) / (bt - at) if None not in (a, b, at, bt) and bt > at else 0
+    check("2x plays at about twice real time", 1.6 < rate < 2.4 or b < a, f"{a} -> {b} over {(bt or 0) - (at or 0):.2f} s, rate {rate:.2f}")
 
+    c = Cursor()
     command("slider 0.5", 0.3)
-    t, _ = replay_time()
-    check("scrubbing to the middle seeks there", t is not None and 14.0 <= t <= 16.5, f"{t}")
+    seeked = stamp(c.wait(r"test: slider", 5))
+    t, _, tt = replay_time_at()
+    # Playing on at 2x between the seek and the reading.
+    want = 15.0 + 2 * (tt - seeked) if None not in (seeked, tt) else 15.0
+    check("scrubbing to the middle seeks there", t is not None and abs(t - want) <= 1.0, f"{t}, expected about {want:.2f}")
 
     c = Cursor()
     command("select .1x 5")
