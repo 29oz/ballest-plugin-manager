@@ -430,7 +430,8 @@ Runs the host's own commands, the same ones as the in-game console (footer **plu
 They're for measuring and debugging. The list is in `src/host/testchannel.hpp`.
 
 == Console::Run
-Runs a host command on the next frame. Its output goes to the log.
+Runs a host command on the next frame. Its output goes to the log. For your own testing and debugging only: plugins
+that use it are not accepted in the registry (see Publishing).
 --
 // Log the current view target (the camera the game is looking through)
 Console::Run("viewtarget");

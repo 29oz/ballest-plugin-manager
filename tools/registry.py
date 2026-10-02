@@ -109,6 +109,12 @@ def add(path, tag, repo_name, folder=""):
         "dependencies": meta.get("dependencies", []),
         "files": {n: hashlib.sha256(git(repo, "show", f"{commit}:{in_repo(folder, n)}")).hexdigest() for n in names},
     }
+    # The review rules (CLAUDE.md, tools/review_guard.py): no built binaries, no Console:: in its scripts.
+    from review_guard import plugin_problems
+    downloaded = {n: git(repo, "show", f"{commit}:{in_repo(folder, n)}") for n in names}
+    problems = plugin_problems(entry["id"], commit, downloaded)
+    if problems:
+        sys.exit("refused by the review rules (see CLAUDE.md):\n  " + "\n  ".join(problems))
     registry = load()
     plugins = [p for p in registry["plugins"] if p["id"] != entry["id"]]
     plugins.append(entry)

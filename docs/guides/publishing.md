@@ -38,6 +38,14 @@ git push origin v0.1.0
 
 ## 3. Ask for it to be added
 
+Two things are never accepted in the registry (checked automatically, see `tools/review_guard.py`):
+
+- **Built binaries**: no `.dll`, `.exe`, archives or other compiled files. Only source and data (pictures, sounds,
+  3D models) can be reviewed.
+- **`Console::`**: plugins must use the API, not the host's console commands, which reach any game function and get
+  around what the API allows. If you need something the API doesn't have, open an issue asking for it.
+
+
 Open an issue on the [plugin manager repo](https://github.com/AnythingGoes-ballest/ballest-plugin-manager/issues)
 with your repo and the tag. The maintainer reviews the code and adds it:
 

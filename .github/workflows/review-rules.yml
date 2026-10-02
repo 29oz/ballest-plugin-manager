@@ -1,0 +1,39 @@
+# The review rules (CLAUDE.md, tools/review_guard.py): no built binaries such as version.dll, and no Console:: in
+# plugins. Every pull request is checked on the files and lines it adds; whenever registry.json changes, every listed
+# plugin is checked as pinned (its files downloaded from its commit).
+name: review rules
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+    paths:
+      - "registry.json"
+      - "tools/review_guard.py"
+      - ".github/workflows/review-rules.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pull-request:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python tools/review_guard.py changed origin/${{ github.base_ref }}
+
+  registry:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python tools/review_guard.py registry
