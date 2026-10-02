@@ -1,4 +1,5 @@
 #include "draw.hpp"
+#include "postprocess.hpp"
 #include "hud.hpp"
 #include "plugins.hpp"
 
@@ -258,6 +259,7 @@ void Start(size_t index) {
     if (builder.StartNewModule(gEngine, p.id.c_str()) < 0) return;
     asIScriptModule* m = builder.GetModule();
     p.module = m;
+    std::vector<std::string> sources;
     for (const auto& file : p.files) {
         std::string code;
         if (!ReadFile(p.dir + L"\\" + eng::Widen(file), code)) {
@@ -266,6 +268,7 @@ void Start(size_t index) {
             return;
         }
         builder.AddSectionFromMemory((p.id + "/" + file).c_str(), code.data(), static_cast<unsigned>(code.size()));
+        sources.push_back(std::move(code));
     }
     if (builder.BuildModule() < 0) {
         p.status = "error: does not compile (see log)";
@@ -281,7 +284,7 @@ void Start(size_t index) {
         hostlog::Write("error", p.id, p.status);
         return;
     }
-    settings::Collect(static_cast<int>(index), p.id, m, builder);      // saved values are in place before Main
+    settings::Collect(static_cast<int>(index), p.id, m, builder, sources);      // saved values are in place before Main
     p.ctx = gEngine->CreateContext();
     p.ctx->SetLineCallback(asFUNCTION(LineCallback), nullptr, asCALL_CDECL);
     p.update = m->GetFunctionByDecl("void Update(float)");
@@ -435,6 +438,7 @@ void Release(size_t i) {
     leaderboard::RemoveOwner(static_cast<int>(i));
     editor::RemoveOwner(static_cast<int>(i));
     draw::RemoveOwner(static_cast<int>(i));
+    postprocess::RemoveOwner(static_cast<int>(i));
     hud::RemoveOwner(static_cast<int>(i));
 }
 

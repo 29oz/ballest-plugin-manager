@@ -29,6 +29,9 @@ int TestNumber = 3;
 [Setting name="Test text" description="Used by the Settings tests"]
 string TestText = "hello";
 
+[Setting name="Test choice" choices="Red|Green|Blue" description="Used by the Settings tests"]
+string TestChoice = "Green";
+
 const string PASS = "ok";
 const string WAIT = "";
 const string ME = "api-tests";
@@ -512,6 +515,18 @@ void RegisterCore()
                            Near(Settings::Min(uint(n)), 0, "Settings::Min"), Near(Settings::Max(uint(n)), 10, "Settings::Max"),
                            Is(Settings::Get(uint(n)) == "3", "Settings::Get '" + Settings::Get(uint(n)) + "'"),
                            Is(Settings::IsDefault(uint(t)), "Settings::IsDefault false before any change")};
+        return All(c);
+    });
+    Add("core", "Settings choices", "Settings::Choices", function() {
+        int ch = MySetting("Test choice"), t = MySetting("Test text");
+        if (ch < 0 || t < 0)
+            return "own choice setting not found";
+        array<string>@ options = Settings::Choices(uint(ch));
+        array<string> c = {Is(options.length() == 3 && options[0] == "Red" && options[2] == "Blue", "Settings::Choices " + options.length()),
+                           Is(Settings::Choices(uint(t)).length() == 0, "Settings::Choices of a setting without choices not empty"),
+                           Is(!Settings::Set(uint(ch), "Purple"), "Settings::Set of a value not among the choices answered true"),
+                           Is(Settings::Set(uint(ch), "Blue") && TestChoice == "Blue", "Settings::Set of a choice: '" + TestChoice + "'")};
+        Settings::Reset(uint(ch));
         return All(c);
     });
     Add("core", "Settings set and reset own", "Settings::Set,Settings::Reset", function() {
@@ -1545,6 +1560,14 @@ void RegisterTrack()
         }
         return Elapsed() > 6 ? "no ground bounce within 6 s of a fling up" : WAIT;
     }, 15);
+    Add("race", "PostProcess", "PostProcess::Set,PostProcess::SetWeight,PostProcess::Clear", function() {
+        array<string> c = {Is(PostProcess::Set("ColorSaturation", 0, 0, 0, 1), "PostProcess::Set ColorSaturation false"),
+                           Is(PostProcess::Set("VignetteIntensity", 0.8), "PostProcess::Set VignetteIntensity false"),
+                           Is(!PostProcess::Set("NoSuchSetting", 1), "PostProcess::Set of a missing setting true"),
+                           Is(PostProcess::SetWeight(0.5), "PostProcess::SetWeight false")};
+        PostProcess::Clear();
+        return All(c);
+    });
     Add("race", "Camera", "Camera::Project,Camera::Take,Camera::Set,Camera::Release,Camera::IsTaken", function() {
         double x, y, z;
         if (!Race::BallPosition(x, y, z))

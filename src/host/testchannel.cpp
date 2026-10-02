@@ -14,6 +14,7 @@
 #include "cosmetics.hpp"
 #include "engine.hpp"
 #include "draw.hpp"
+#include "postprocess.hpp"
 #include "game.hpp"
 #include "hud.hpp"
 #include "race.hpp"
@@ -312,8 +313,12 @@ void Run(const std::string& cmd) {
     static const std::map<std::string, void (*)(const Args&, const std::string&)> commands = {
         {"state", [](const Args&, const std::string&) { Report("state " + ui::Status() + " | plugins: " + plugins::Summary()); }},
         {"click", [](const Args&, const std::string& c) { Report(c + (ui::SimulateClick(c.substr(6)) ? " -> ok" : " -> no such button")); }},
-        {"select", [](const Args& a, const std::string& c) {
-             Report(c + (ui::SimulateSelect(Arg(a, 1), std::atoi(Arg(a, 2).c_str())) ? " -> ok" : " -> no such dropdown"));
+        {"select", [](const Args&, const std::string& c) {          // select <first option> <index> (the option may have spaces)
+             const std::string rest = c.size() > 7 ? c.substr(7) : "";
+             const size_t space = rest.find_last_of(' ');
+             const std::string first = space == std::string::npos ? rest : rest.substr(0, space);
+             const int index = space == std::string::npos ? 0 : std::atoi(rest.c_str() + space + 1);
+             Report(c + (ui::SimulateSelect(first, index) ? " -> ok" : " -> no such dropdown"));
          }},
         {"slider", [](const Args& a, const std::string& c) {
              ui::SimulateSlider(static_cast<float>(std::atof(Arg(a, 1).c_str())));
@@ -353,8 +358,12 @@ void Run(const std::string& cmd) {
         {"setting", [](const Args& a, const std::string& c) {
              const auto& list = settings::List();
              for (size_t i = 0; i < list.size(); ++i)
-                 if (list[i].pluginId == Arg(a, 1) && list[i].variable == Arg(a, 2))
-                     return Report(c + (settings::Set(i, Arg(a, 3)) ? " -> " + settings::Get(i) : " -> not a value"));
+                 if (list[i].pluginId == Arg(a, 1) && list[i].variable == Arg(a, 2)) {
+                     // the value is the rest of the line (it may have spaces)
+                     const size_t at = c.find(Arg(a, 2)) + Arg(a, 2).size() + 1;
+                     const std::string value = at < c.size() ? c.substr(at) : "";
+                     return Report(c + (settings::Set(i, value) ? " -> " + settings::Get(i) : " -> not a value"));
+                 }
              Report(c + " -> no such setting");
          }},
         {"editor", [](const Args& a, const std::string&) {
@@ -402,6 +411,19 @@ void Run(const std::string& cmd) {
                  Report(c + " -> counting from now");
              gFpsSince = now;
              gFpsFrames = gHostFrames;
+         }},
+        {"pp", [](const Args& a, const std::string& c) {           // pp <setting> <x> [y z w]: a post-process setting (test filter)
+             std::string error;
+             const bool ok = postprocess::Set(-2, Arg(a, 1), std::atof(Arg(a, 2).c_str()), std::atof(Arg(a, 3).c_str()),
+                                              std::atof(Arg(a, 4).c_str()), a.size() > 5 ? std::atof(Arg(a, 5).c_str()) : 1.0, &error);
+             Report(c + (ok ? " -> ok" : " -> " + error));
+         }},
+        {"ppweight", [](const Args& a, const std::string& c) {     // ppweight <0..1>: the test filter's strength; ppclear: none
+             Report(c + (postprocess::Weight(-2, std::atof(Arg(a, 1).c_str())) ? " -> ok" : " -> failed"));
+         }},
+        {"ppclear", [](const Args&, const std::string& c) {
+             postprocess::Clear(-2);
+             Report(c + " -> ok");
          }},
         {"console", [](const Args&, const std::string& c) {        // console <command>: an engine console command (t.MaxFPS 30)
              const std::wstring command = eng::Widen(c.size() > 8 ? c.substr(8) : "");

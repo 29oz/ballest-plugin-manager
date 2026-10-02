@@ -25,12 +25,15 @@ struct Setting {
     Kind kind = Kind::Bool;
     bool hasRange = false, hidden = false;
     double min = 0, max = 0;
+    std::vector<std::string> choices;   // a string setting with choices="A|B|C": one of these (a dropdown)
     std::string defaultValue;
     void* address = nullptr;            // the script global; valid while the plugin's module exists
 };
 
 // After the plugin's module is built and before Main: reads its [Setting] globals and applies saved values.
-void Collect(int plugin, const std::string& pluginId, asIScriptModule* module, CScriptBuilder& builder);
+// `sources` is the plugin's script files' text, in order: settings are listed in the order they're declared there.
+void Collect(int plugin, const std::string& pluginId, asIScriptModule* module, CScriptBuilder& builder,
+             const std::vector<std::string>& sources);
 void Forget(int plugin);                // the plugin is unloaded: its variables are gone
 void Frame();                           // writes changed values to storage, a few times a second at most
 

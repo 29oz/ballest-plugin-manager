@@ -74,6 +74,8 @@ array<UI::TextInput@> inputs;
 array<uint> inputSetting;
 array<string> inputShown;       // per text box: the value it was last given
 array<UI::Button@> resets;
+array<UI::Dropdown@> dropdowns;         // a choice setting's list (choices="A|B|C")
+array<uint> dropdownSetting;
 array<uint> resetSetting;
 UI::Button@ positionReset;
 string shownSettings;           // what the settings view was built from
@@ -670,11 +672,21 @@ void AddSettingRow(uint i)
     menu.AddText(Settings::Name(i), 19);
     menu.AddSpace(0);
     string kind = Settings::Kind(i);
+    array<string>@ options = Settings::Choices(i);
     if (kind == "bool")
     {
         UI::Button@ toggle = menu.AddButton(Settings::Get(i) == "true" ? "on" : "off");
         toggles.insertLast(toggle);
         toggleSetting.insertLast(i);
+    }
+    else if (options.length() > 0)
+    {
+        UI::Dropdown@ drop = menu.AddDropdown(240);
+        for (uint k = 0; k < options.length(); k++)
+            drop.AddOption(options[k]);
+        drop.selected = options.find(Settings::Get(i));
+        dropdowns.insertLast(drop);
+        dropdownSetting.insertLast(i);
     }
     else
     {
@@ -716,6 +728,8 @@ void BuildSettings()
     inputShown.resize(0);
     resets.resize(0);
     resetSetting.resize(0);
+    dropdowns.resize(0);
+    dropdownSetting.resize(0);
     @positionReset = null;
 
     int p = InstalledIndex(settingsPlugin);
@@ -800,6 +814,16 @@ void UpdateSettings()
     for (uint n = 0; n < resets.length(); n++)
         if (resets[n].Clicked())
             Settings::Reset(resetSetting[n]);
+    for (uint n = 0; n < dropdowns.length(); n++)
+    {
+        uint i = dropdownSetting[n];
+        array<string>@ options = Settings::Choices(i);
+        if (dropdowns[n].Changed() && dropdowns[n].selected >= 0 && uint(dropdowns[n].selected) < options.length())
+            Settings::Set(i, options[uint(dropdowns[n].selected)]);
+        int current = options.find(Settings::Get(i));        // follows a reset, say
+        if (dropdowns[n].selected != current)
+            dropdowns[n].selected = current;
+    }
     if (positionReset !is null && positionReset.Clicked())
         UI::ResetPositions(settingsPlugin);
     for (uint n = 0; n < toggles.length(); n++)

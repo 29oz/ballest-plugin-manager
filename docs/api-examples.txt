@@ -325,6 +325,14 @@ The setting's `max` (meaningful when `HasRange`).
 // Value for a slider position (0..1)
 double value = Settings::Min(i) + slider.value * (Settings::Max(i) - Settings::Min(i));
 
+== Settings::Choices
+A string setting's choices, from `choices="A|B|C"` in its tag (shown as a dropdown); empty for any other setting.
+`Set` only takes one of them. Requires host 0.21.0.
+--
+array<string>@ options = Settings::Choices(i);
+for (uint k = 0; k < options.length(); k++)
+    dropdown.AddOption(options[k]);
+
 == Settings::Get
 The setting's current value as text (`"true"`, `"56"`, `"0.35"`, ...).
 --
@@ -2244,6 +2252,35 @@ Draw::Remove(trail);
 Removes every shape the plugin made.
 --
 Draw::Clear();
+
+@@ PostProcess
+A filter over the whole view: the engine's post-process settings (colour grading, white balance, tint, bloom,
+vignette, colour fringing, film grain, exposure), set by name. The game's world is filtered; its menus and the
+plugins' windows aren't. Each plugin has one filter of its own, kept when the map changes and taken off when the plugin
+stops. Everything here needs host 0.21.0.
+
+== PostProcess::Set
+Sets one of the engine's post-process settings by its name, as `FPostProcessSettings` names it: a number takes `x`;
+a colour takes `x, y, z, w` as red, green, blue and alpha; the colour-grading ones (`ColorSaturation`,
+`ColorContrast`, `ColorGamma`, `ColorGain`, `ColorOffset` and their `Shadows`, `Midtones` and `Highlights` forms)
+take red, green, blue and an overall multiplier. False (with why in the log) if there's no such setting. Grading
+applies after `SceneColorTint`, so tint with `ColorGain` when saturation is lowered; `WhiteTemp` above 6500 is warmer,
+below is cooler (measured).
+--
+// A black-and-white look with a dark vignette
+PostProcess::Set("ColorSaturation", 0, 0, 0, 1);
+PostProcess::Set("ColorContrast", 1.4, 1.4, 1.4, 1);
+PostProcess::Set("VignetteIntensity", 1);
+
+== PostProcess::SetWeight
+How strong the filter is, from 0 (none) to 1 (full): everything set is blended in by this much.
+--
+PostProcess::SetWeight(Intensity / 100);
+
+== PostProcess::Clear
+Takes the filter off: everything this plugin set goes.
+--
+PostProcess::Clear();
 
 @@ Camera
 Looking through a camera of your own, and where things are on screen. Everything here needs host 0.14.0.

@@ -20,6 +20,7 @@
 
 #include "cosmetics.hpp"
 #include "draw.hpp"
+#include "postprocess.hpp"
 #include "ghosts.hpp"
 #include "tracks.hpp"
 #include "game.hpp"
@@ -119,6 +120,12 @@ bool SettingHidden(unsigned i) { return SettingAt(i).hidden; }
 bool SettingHasRange(unsigned i) { return SettingAt(i).hasRange; }
 double SettingMin(unsigned i) { return SettingAt(i).min; }
 double SettingMax(unsigned i) { return SettingAt(i).max; }
+CScriptArray* SettingChoices(unsigned i) {
+    const auto& choices = SettingAt(i).choices;
+    CScriptArray* array = CScriptArray::Create(e->GetTypeInfoByDecl("array<string>"), static_cast<asUINT>(choices.size()));
+    for (asUINT k = 0; k < choices.size(); ++k) *static_cast<std::string*>(array->At(k)) = choices[k];
+    return array;
+}
 std::string SettingKind(unsigned i) {
     switch (SettingAt(i).kind) {
         case settings::Kind::Bool: return "bool";
@@ -539,6 +546,7 @@ void RegisterCore() {
     Global("bool HasRange(uint)", asFUNCTION(SettingHasRange));
     Global("double Min(uint)", asFUNCTION(SettingMin));
     Global("double Max(uint)", asFUNCTION(SettingMax));
+    Global("array<string>@ Choices(uint)", asFUNCTION(SettingChoices));
     Global("string Get(uint)", asFUNCTION(SettingGet));
     Global("bool IsDefault(uint)", asFUNCTION(SettingIsDefault));
     Global("bool Set(uint, const string &in)", asFUNCTION(SettingSet));
@@ -1151,6 +1159,14 @@ bool DrawEffect(const std::string& system, double x, double y, double z, double 
     return draw::Effect(system, x, y, z, scale, nx, ny, nz);
 }
 bool DrawSound(const std::string& sound, double volume, double pitch) { return draw::Sound(sound, volume, pitch); }
+bool PostProcessSet(const std::string& name, double x, double y, double z, double w) {
+    std::string error;
+    if (postprocess::Set(plugins::Current(), name, x, y, z, w, &error)) return true;
+    hostlog::Write("warn", plugins::CurrentId(), "post-process: " + error);
+    return false;
+}
+bool PostProcessWeight(double weight) { return postprocess::Weight(plugins::Current(), weight); }
+void PostProcessClear() { postprocess::Clear(plugins::Current()); }
 bool CameraShake(double scale) { return draw::Shake(scale); }
 // Bounces: each plugin reads from its own place in the list (race.hpp), starting from the first call.
 std::map<int, int> gBounceRead;
@@ -1290,6 +1306,10 @@ void RegisterGhosts() {
     Global("bool Effect(const string &in, double x, double y, double z, double scale = 1, double nx = 0, double ny = 0, double nz = 1)",
            asFUNCTION(DrawEffect));
     Global("bool Sound(const string &in, double volume = 1, double pitch = 1)", asFUNCTION(DrawSound));
+    e->SetDefaultNamespace("PostProcess");
+    Global("bool Set(const string &in, double x, double y = 0, double z = 0, double w = 1)", asFUNCTION(PostProcessSet));
+    Global("bool SetWeight(double)", asFUNCTION(PostProcessWeight));
+    Global("void Clear()", asFUNCTION(PostProcessClear));
     e->SetDefaultNamespace("Camera");
     Global("bool Shake(double scale = 1)", asFUNCTION(CameraShake));
     Global("bool Project(double, double, double, float &out, float &out)", asFUNCTION(CameraProject));

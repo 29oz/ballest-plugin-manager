@@ -8,6 +8,7 @@
 #include <string>
 
 #include "draw.hpp"
+#include "postprocess.hpp"
 #include "ghosts.hpp"
 #include "steam.hpp"
 #include "tracks.hpp"
@@ -102,6 +103,7 @@ void HostFrame(float dt) {
     steam::Frame();
     ghosts::Frame();
     draw::Frame();
+    postprocess::Frame();
     tracks::Frame();
     hud::Frame();
     replay::Frame(dt);

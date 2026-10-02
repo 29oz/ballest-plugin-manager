@@ -15,6 +15,13 @@ bool ShowRestarts = true;
 string Label = "grind";
 ```
 
+```cpp
+[Setting name="Filter" choices="No filter|Noir|Old Film"]
+string Filter = "No filter";
+```
+
+The settings page lists a plugin's settings in the order they're declared (host 0.21.0 and newer).
+
 The value you give the variable is the **default**. By the time `Main()` runs, the player's saved value (if any) is
 already in the variable, so just use it.
 
@@ -24,6 +31,7 @@ already in the variable, so just use it.
 |---|---|
 | `bool` | an on/off button |
 | a number with `min` and `max` | a slider, plus a text box for an exact value |
+| a `string` with `choices` | a dropdown of those choices |
 | any other number, or `string` | a text box (type, then Enter) |
 
 Numbers are kept between `min` and `max`. Allowed types: `bool`, `int`, `uint`, `float`, `double`, `string`.
@@ -35,6 +43,7 @@ Numbers are kept between `min` and `max`. Allowed types: `bool`, `int`, `uint`, 
 | `name="..."` | What the settings page calls it. Without it, the variable's name is used. |
 | `description="..."` | A line of explanation under the name. |
 | `min=` and `max=` | The allowed range. With both, the setting gets a slider. |
+| `choices="A\|B\|C"` | For a `string`: the values it can have, separated by `\|`, shown as a dropdown (host 0.21.0 and newer; an older host shows a text box). Any other value is refused. |
 | `hidden` | Saved, but not shown on the settings page. Useful for values your plugin sets itself. |
 
 ## Reacting to changes
