@@ -520,6 +520,23 @@
       }
     },
     {
+      "id": "screen-filters",
+      "name": "Screen Filters",
+      "description": "Changes the look of the whole game: noir, old film, vaporwave, neon night, golden hour and more, with an intensity slider.",
+      "author": "AnythingGoes",
+      "repo": "AnythingGoes-ballest/ballest-screen-filters",
+      "version": "0.1.0",
+      "commit": "69a8c9715f13db8ff276b1359997c838177a664e",
+      "min_host": "0.21.0",
+      "icon": "icon.png",
+      "dependencies": [],
+      "files": {
+        "info.toml": "1a88382f6ecf274d0dca71d1b6068306b9a2668169df37eb2c1035a58d1758a7",
+        "main.as": "079ac4782082d1a98416b25e68150dadb926192ca717c93ccdb45f5a1d87b603",
+        "icon.png": "f32a3835f1fa75b5df5d553910155c715a141b69e1bc7b168e703f0cb94a24d6"
+      }
+    },
+    {
       "id": "two-tone-balls",
       "name": "Two-Tone Balls",
       "description": "Ten two-tone balls: clear glass with the lower half in colour (red, orange, yellow, lime, green, teal, blue, purple, pink, black).",
@@ -560,18 +577,18 @@
     }
   ],
   "host": {
-    "version": "0.20.2",
+    "version": "0.21.0",
     "repo": "AnythingGoes-ballest/ballest-plugin-manager",
-    "commit": "9984c8fb75c4b17754e645926e0fbbd6bb8f7e57",
-    "dll": "https://github.com/AnythingGoes-ballest/ballest-plugin-manager/releases/download/v0.20.2/version.dll",
-    "dll_sha256": "46a7cc1ec7fd9e592187bd1c91e3f699c4abeb976d3493088e73674bc7cc6b9b",
+    "commit": "a627cc6d2a89de61f7a23f2a83f89c152d09c2a9",
+    "dll": "https://github.com/AnythingGoes-ballest/ballest-plugin-manager/releases/download/v0.21.0/version.dll",
+    "dll_sha256": "4dfbb7cc1f06cd7cd7ea4999fe6171bc413f852cccbc569e3eaa0aaea24c3cea",
     "files": {
       "plugins/hello-world/info.toml": "5300e78277bc1e92d4d1626ce17ed15e938f37e692b2271b58c3c9c30b79be40",
       "plugins/hello-world/main.as": "24f510821cb3ea7825bfef6363d92e12fd493b9977038beb9e6c297a692fb23b",
       "plugins/plugin-manager/default-icon.png": "304d27462febbf15c8645b64ae6b01624e4a59e29e0304ffac1f28313a3ba362",
       "plugins/plugin-manager/icon.png": "fb60df477ecffe4942dc7500d2f4f6cb8b65d017bde68b49b81541c29f8e144e",
       "plugins/plugin-manager/info.toml": "d08b9dc72e63042a39ff3f029f06e650d48cd716881c5593ca57a4cccc103ac7",
-      "plugins/plugin-manager/main.as": "bc2b7d1997a0b8b2aaba7782fa8f0fe22e42a1353b50877bc934c0b524508ba0"
+      "plugins/plugin-manager/main.as": "788e459012cb0e9cda2b2aa8e572b50c70da222eb8ab46b02e6e0b65de122946"
     }
   }
 }
