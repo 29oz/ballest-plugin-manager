@@ -70,6 +70,8 @@ double d1 = 0, d2 = 0, d3 = 0;
 string s1 = "";
 // Kept between tests.
 UI::Window@ win;
+UI::Window@ clearWin;
+UI::TextInput@ clearInput;
 string level = "";              // the first official track
 string savedBall = "";
 
@@ -971,6 +973,23 @@ void RegisterUi()
         }
         return PASS;
     }, 12);
+    Add("ui", "UI text input clear button", "TextInput.clearButton,TextInput.Cleared", function() {
+        // The x is clicked by the player; here: a box with one builds, and Cleared() stays false until it's clicked.
+        if (step == 0)
+        {
+            @clearWin = UI::CreateWindow();
+            @clearInput = clearWin.AddTextInput(200, "api clear");
+            clearInput.clearButton = true;
+            clearInput.value = "words";
+            step = 1;
+            return WAIT;
+        }
+        if (Elapsed() < 0.5)
+            return WAIT;
+        bool cleared = clearInput.Cleared();
+        clearWin.visible = false;
+        return Is(!cleared, "TextInput.Cleared true without a click");
+    }, 5);
     Add("ui", "UI text area and image", "TextArea.text,TextArea.visible,Image.path,Image.visible", function() {
         if (win is null)
             return "no window";
@@ -1355,16 +1374,22 @@ void RegisterTracks()
         Workshop::Forget(id1);
         return All(c);
     }, 40);
-    Add("tracks", "Hub off screen", "Hub::Shown,Hub::Entries,Hub::Focused,Hub::FocusedAuthor,Hub::HideEntry", function() {
+    Add("tracks", "Hub off screen", "Hub::Shown,Hub::Entries,Hub::Focused,Hub::FocusedAuthor,Hub::HideEntry,Hub::ListShown,Hub::View,Hub::Thumbnails,Hub::SetEntryBadge,Hub::SetAuthorButton,Hub::AuthorButtonClicked", function() {
         // The run starts on the main menu with the play page showing the game's own tracks, not the hub.
         array<string> c = {Is(!Hub::Shown(), "Hub::Shown true on the main menu"),
                            Is(!Hub::HideEntry("1", true), "Hub::HideEntry of a map not on the list answered true"),
                            Is(Hub::Focused() == "" || parseInt(Hub::Focused()) > 0, "Hub::Focused '" + Hub::Focused() + "'"),
                            Is(Hub::FocusedAuthor() == "" || parseInt(Hub::FocusedAuthor()) > 0, "Hub::FocusedAuthor '" + Hub::FocusedAuthor() + "'"),
-                           Is(Hub::Entries().length() <= 50, "Hub::Entries " + Hub::Entries().length())};
+                           Is(Hub::Entries().length() <= 50, "Hub::Entries " + Hub::Entries().length()),
+                           Is(!Hub::ListShown(), "Hub::ListShown true on the main menu"),
+                           Is(Hub::View() == "", "Hub::View '" + Hub::View() + "' on the main menu"),
+                           Is(Hub::Thumbnails().length() == 0, "Hub::Thumbnails " + Hub::Thumbnails().length() + " on the main menu"),
+                           Is(!Hub::SetEntryBadge("1", "7"), "Hub::SetEntryBadge of a map not on screen answered true")};
+        Hub::SetAuthorButton("");
+        c.insertLast(Is(!Hub::AuthorButtonClicked(), "Hub::AuthorButtonClicked true without a button"));
         return All(c);
     });
-    Add("tracks", "Hub search", "Hub::Search,Hub::Shown,Hub::Entries,Hub::HideEntry,Window.DockInHub", function() {
+    Add("tracks", "Hub search", "Hub::Search,Hub::Shown,Hub::Entries,Hub::HideEntry,Window.DockInHub,Hub::ListShown,Hub::View,Hub::Thumbnails,Hub::SetEntryBadge,Hub::SetAuthorButton", function() {
         // Opens the hub (the play page's workshop side) the way its own tab does, then searches in it.
         if (step == 0)
         {
@@ -1398,8 +1423,19 @@ void RegisterTracks()
         }
         bool stillListed = Hub::Entries().find(s1) >= 0;
         Hub::HideEntry(s1, false);
+        array<string>@ shown = Hub::Thumbnails();
+        bool badged = shown.length() > 0 && Hub::SetEntryBadge(shown[0], "7");
+        if (shown.length() > 0)
+            Hub::SetEntryBadge(shown[0], "");
+        Hub::SetAuthorButton("api tests");
+        Hub::SetAuthorButton("");
         win.visible = false;
-        return Is(stillListed, "Hub::Entries left out a map Hub::HideEntry hid");
+        array<string> c = {Is(stillListed, "Hub::Entries left out a map Hub::HideEntry hid"),
+                           Is(Hub::ListShown(), "Hub::ListShown false with the search's list on screen"),
+                           Is(Hub::View() == "list", "Hub::View '" + Hub::View() + "' with the list on screen"),
+                           Is(shown.find(ids[0]) >= 0, "Hub::Thumbnails left out the list's first map"),
+                           Is(badged, "Hub::SetEntryBadge answered false for a map on screen")};
+        return All(c);
     }, 40);
     Add("tracks", "Ghosts load a leaderboard", "Ghosts::Load,Ghosts::State,Ghosts::Leaderboard,Ghosts::Entries,Ghosts::WithoutReplay,Ghosts::Count", function() {
         if (level == "")
