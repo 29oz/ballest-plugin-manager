@@ -69,9 +69,9 @@ bool gFixMenuHat = false;                           // an extra was picked: the 
 // Public and local choices: the Customize page's two modes. Public is the game's own choice (the profile, which is
 // what hiscores, replays and other players get); local is worn on the player's own balls only, and is a custom
 // cosmetic (gEquipped) or another of the game's (gLocalGame), per kind, or nothing (the public one). The page opens
-// in public mode.
-enum Mode { kPublic = 0, kLocal = 1 };
-int gMode = kPublic;
+// in local mode.
+enum Mode { kLocal = 0, kPublic = 1 };
+int gMode = kLocal;
 eng::Weak gLocalGame[3];
 std::string gLocalPath[3];                          // its object path, as saved
 bool gLocalLoaded = false, gLocalChanged = false;
@@ -1111,7 +1111,7 @@ void Highlight(Obj page, int tab) {
 // top, each with the ball and hat it stands for. The panel is the page's MenuOverlay (the scroll box's grandparent,
 // read from the page's widget tree); the buttons are in a box on its right edge, moved past it by their own width.
 constexpr float kThumbSize = 36, kPanelGap = 24;
-const char* const kModeLabel[2] = {"public", "local"};
+const char* const kModeLabel[2] = {"local", "public"};
 struct ModeButton {
     eng::Weak tab, hitbox, text, ball, hat;
     eng::Weak shownBall, shownHat;
@@ -1752,9 +1752,9 @@ void Frame() {
     Obj page = eng::Get(gPage);
     if (!page && search && (page = LivePage())) gPage = eng::MakeWeak(page);
     if (page) {
-        // The page opens in public mode each time it is shown.
+        // The page opens in local mode each time it is shown.
         const bool shown = PageShown(page);
-        if (shown && !gPageWasShown) SetMode(page, kPublic);
+        if (shown && !gPageWasShown) SetMode(page, kLocal);
         gPageWasShown = shown;
         if (!eng::Get(gModeBox) || !Parent(eng::Get(gModeBox))) BuildModeButtons(page);
         WatchModeButtons(page);

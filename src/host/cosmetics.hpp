@@ -14,10 +14,11 @@
 //   * the game saves the page's choice to the profile, which is also what multiplayer is told: a custom asset there
 //     is saved as a path no later session can load (measured: the ball came back with no material). So the save keeps
 //     the game's own choice, and the host puts the custom one on the player's own balls and checkpoints.
-//   * public and local: the page gets "public" and "local" buttons. Public picks are the game's own (saved, seen by
-//     others and on hiscores); local picks, any game cosmetic or custom one, are worn on the player's own balls only and
-//     are kept in cosmetics_local.txt (game ones; custom ones are kept by the plugin that restores them). The page opens
-//     in public mode, with the custom section hidden.
+//   * local and public: the page gets "local" and "public" buttons. Public tab allows the player to choose how others
+//     see their ghost, whether via highscores or on multiplayer maps like the tower; Local, however, allows the player
+//     to select a local-only cosmetic appearance, either vanilla or custom, which can only be worn by the player's own ball
+//     and is kept in cosmetics_local.txt (game ones; custom ones are kept by the plugin that restores them). The page opens
+//     in local mode.
 // Game thread only.
 #pragma once
 #include <string>
