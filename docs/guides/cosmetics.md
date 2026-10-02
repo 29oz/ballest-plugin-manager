@@ -29,14 +29,15 @@ The functions are the same as [Cosmetics](../reference/api/cosmetics.md) in the 
 
 ## Who sees them
 
-The Customize page has two buttons beside the cosmetics panel, **public** and **local**, each showing the ball and hat
+The Customize page has two buttons beside the cosmetics panel, **local** and **public**, each showing the ball and hat
 it stands for:
 
-- **Public** is the game's own choice: saved to the profile, shown to other players and recorded with hiscores. Only
-  the game's cosmetics can be picked here. The page opens in public mode.
 - **Local** is worn on the player's own ball only: the menu ball and the ball they race with. Any cosmetic can be
   picked here, the game's or a custom one, for balls, hats and goal explosions. Picking the public one again makes
-  local match public.
+  local match public. The page opens in local mode.
+- **Public** is the game's own choice: saved to the profile, and what other players see of the player: their ghost on
+  hiscores and replays, and their ball on multiplayer maps such as the Tower. Only the game's cosmetics can be picked
+  here. To change how others see you, switch to public first.
 
 Custom cosmetics are always local, so the section of custom ones shows in local mode only. That way removing a plugin
 never leaves the profile pointing at something that no longer exists.

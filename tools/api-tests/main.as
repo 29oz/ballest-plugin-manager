@@ -1125,8 +1125,8 @@ void RegisterCustomize()
     Add("customize", "Cosmetics equip", "Cosmetics::Equip,Cosmetics::Equipped", function() {
         if (step == 0)
         {
-            // The page opens in public mode, where the menu ball shows the game's own choice (host 0.17.0 on); custom
-            // cosmetics show on it in local mode.
+            // Custom cosmetics show on the menu ball in local mode (the page opens in it); in public
+            // mode it shows the game's own choice (host 0.17.0 on). The test sets the mode itself either way.
             Console::Run("cosmode local");
             wornBall = Cosmetics::Equipped(Cosmetics::Ball);
             wornHat = Cosmetics::Equipped(Cosmetics::Hat);
