@@ -323,6 +323,48 @@
       }
     },
     {
+      "id": "glass-balls",
+      "name": "Glass Balls",
+      "description": "Real glass balls, clear or in 10 colours: see-through, bending the track behind them, with live reflections of the track around you.",
+      "author": "AnythingGoes",
+      "repo": "AnythingGoes-ballest/ballest-glass-balls",
+      "version": "0.1.0",
+      "commit": "a61d868f715025cd3ca97caf875320c92cc72090",
+      "min_host": "0.23.2",
+      "icon": "icon.png",
+      "dependencies": [
+        "cosmetic-kit"
+      ],
+      "files": {
+        "info.toml": "4fc516e1a583fac4f4c83470c7da8c6e05356a2d670f59af6a00129910f169d9",
+        "main.as": "457c1ca906aad85395c7d3cdb6a1f6cd775e7e533fe4178d412f44ebc3dd1459",
+        "preview.png": "3150a698cf32502f179f3fc447aeb2de727f458215a5fa60297a9ca6551aa53c",
+        "previews/blue.png": "c6b8a9ca87c5c570da7da5c74f8536a8109277e863a80ac700e02bc2195b6a94",
+        "previews/cyan.png": "ba5590c1793c525c440536c7c461f4c812b6d7c4c88f52dab48c389303062013",
+        "previews/gold.png": "ac3b10824002b51557257e4de90c0cb85a9987a9e996d2d7a7fe20bbc200aad8",
+        "previews/green.png": "9b5f93ea5f45bba9ab2fe4796a6be62f58b6c59d9076afc71716104dda76bf98",
+        "previews/orange.png": "1d396f0d7ae57d45bc769b524e22d5b62ec639924243e458b51d2fef703b45f0",
+        "previews/pink.png": "8a7965a7bd29f3bf9b62101240037dd32aebdafdabec455d49ffdcae833db116",
+        "previews/purple.png": "2d74cf9b10f7082c07e2fe4c50267ad7c954ab00e5e878bbade94e6c441c3b8d",
+        "previews/red.png": "e517c6a745b7ddff828d21dda65aac454fdcff9779ff3a30611dd7cd6ba25a1f",
+        "previews/smoke.png": "2621f3f41d6725f705fc3fff93c639c4a20147ef0103c129d519a124450ae150",
+        "previews/yellow.png": "1c52a0587fd276504a41b838f817d127acef891700d1a564fd8c3ecaa99ba3f8",
+        "models/glass_ball.txt": "a5e33ddb995b433bf5725de98eb138db08582b0e3ae945394bae06f1d4c36148",
+        "models/glass_blue.txt": "47f2a48f5fa94ee769f617dd6d697e3a6b1c7c0b32a7bba18d5b78978776a074",
+        "models/glass_cyan.txt": "fe86f494152c21bf4caba95cc302e01680f590290d8d460fda5372d083ee4be1",
+        "models/glass_gold.txt": "ffc5667bb1faa83b914d8ed04bfc1f3a6eea3f2b728aa86ca472d0aa3cf72a1e",
+        "models/glass_green.txt": "f118e2af62bffbc2227199395fb592941107c0d264e0a1c7d92ffac532d8fcb6",
+        "models/glass_orange.txt": "2ceeb28b7cd8ae774d9c03e0a943e6d322966661a2b25ce963fc88c5641aaab0",
+        "models/glass_pink.txt": "84bc06276efa05451cd98cd19104e6a9b13e5cb8d137a82e46b3ca41dd7b02f3",
+        "models/glass_purple.txt": "390e2c3f735170bd6d516014eb5445e39b6c2335117f68642e89d4d94de5ed37",
+        "models/glass_red.txt": "bc59b978757f26ad91b85a5ca121384f1f20162cab4d517e574b0a669f55554e",
+        "models/glass_smoke.txt": "2f084e9f56cd0318219ffd0472e17ae3c8778def18fff4187d10f4f3abdf673a",
+        "models/glass_yellow.txt": "434ee3cff08fa708cd07d9bb1878de7e91f2e9cf5b51237ec9d8968b7af79077",
+        "models/glass_sphere.glb": "f2d9aaa291e68f8260e52cc8957376eebf05bc4f4be5317661817e563b07276a",
+        "icon.png": "c7659b6837e8bdd7397effd70ec3b64d93f4a5b1e5d475264e85ffea01857460"
+      }
+    },
+    {
       "id": "grind-stats",
       "name": "Grind Stats",
       "description": "Time spent, restarts, and respawns and falls at each checkpoint, for every map you play, with totals across all of them.",
@@ -594,11 +636,11 @@
     }
   ],
   "host": {
-    "version": "0.23.1",
+    "version": "0.23.2",
     "repo": "AnythingGoes-ballest/ballest-plugin-manager",
-    "commit": "a270771633ce22fa07bfa6b846c123321876ecf0",
-    "dll": "https://github.com/AnythingGoes-ballest/ballest-plugin-manager/releases/download/v0.23.1/version.dll",
-    "dll_sha256": "ac7f702e500096076b5e116b2adc208cca3ffde170c09c55123da7c619e6a1db",
+    "commit": "6c5efcb7510d8a75d225733217298685edf3741d",
+    "dll": "https://github.com/AnythingGoes-ballest/ballest-plugin-manager/releases/download/v0.23.2/version.dll",
+    "dll_sha256": "55e798b1075ba2523f71a34ab51894bf160ad8619c6f031f5a3d2300336bc9d6",
     "files": {
       "plugins/hello-world/info.toml": "5300e78277bc1e92d4d1626ce17ed15e938f37e692b2271b58c3c9c30b79be40",
       "plugins/hello-world/main.as": "24f510821cb3ea7825bfef6363d92e12fd493b9977038beb9e6c297a692fb23b",
