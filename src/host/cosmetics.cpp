@@ -1511,7 +1511,8 @@ bool AddBall(const std::string& id, const std::string& name, const std::wstring&
         }
         KeepAlive(material);
         SetVector(material, "ColorGlass", 1, 1, 1, 1);
-        SetScalar(material, "Opacity", kClearBallOpacity);
+        // A model that is the whole ball (a glass sphere around it, "ball hidden") would show the game's ball inside it.
+        SetScalar(material, "Opacity", c.hasModel && c.model.hideBall ? 0 : kClearBallOpacity);
         Obj asset = Create(Kind::Ball, id, name, Texture(preview));
         if (!asset) return false;
         SetObject(asset, "SkinMaterial", material);

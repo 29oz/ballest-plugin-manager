@@ -19,6 +19,8 @@ struct Material {
     float metallic = 0, rough = 0.5f;
     float er = 0, eg = 0, eb = 0;                    // emission (linear)
     std::wstring textureFile;                        // the base colour image, as a file ("" for none)
+    // glTF KHR_materials_transmission / _ior / _specular (Blender writes them for its glass): 0 when not given.
+    float transmission = 0, ior = 1.5f, specular = 1;
 };
 
 // Triangles of one material of one mesh node: what stays the same whatever the pose.

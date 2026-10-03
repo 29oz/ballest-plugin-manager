@@ -16,6 +16,7 @@
 #include "game.hpp"
 #include "log.hpp"
 #include "meshfile.hpp"
+#include "race.hpp"
 
 namespace models {
 namespace {
@@ -37,6 +38,12 @@ const wchar_t* kGlowMaterial = L"/Game/Art/Materials/Environment/Materials/Insta
 // water's pass (GlassInWatersPass).
 const wchar_t* kClearGlassMaterial = L"/Game/Art/Materials/Masters/M_GlassV2.M_GlassV2";
 const wchar_t* kTintedGlassMaterial = L"/Game/Art/Materials/Masters/M_Glass.M_Glass";
+// Refracting glass: the EP Master Materials glass the game ships (MM_EP_GlassPBR, read from the package), through its
+// example instance, which brings the reflection picture ("Fake Cubemap") and a flat normal. Its parameters (names read
+// in game with matparams): [Glass] Refraction, Translucent Color, Reflective color, Curvature, Chromatic Aberration,
+// [Opacity] Value, [Roughness] Value, [Specular] Value.
+const wchar_t* kRefractingGlassMaterial =
+    L"/Game/Packs/EPMasterMaterials/Materials/Instances/Examples/Glass/MI_EP_GlassExample01d.MI_EP_GlassExample01d";
 
 struct Vec3 {
     double x, y, z;
@@ -164,6 +171,14 @@ bool LoadMesh(const std::string& fileName, const std::vector<std::string>& optio
                 mat.finish = Finish::Glow;
                 mat.r = fm.er / glow, mat.g = fm.eg / glow, mat.b = fm.eb / glow;
                 mat.bright = 5 * glow;
+            } else if (fm.transmission > 0.01f) {
+                // Blender's glass (Transmission, IOR): refracting glass, tinted by its base colour, reflecting by its
+                // specular. The more it transmits, the less of the glass itself is drawn.
+                mat.finish = Finish::Glass;
+                mat.refracts = mat.tinted = true;
+                mat.ior = std::clamp(fm.ior, 1.0f, 3.0f);
+                mat.reflect = std::clamp(fm.specular, 0.0f, 1.0f);
+                mat.opacity = std::clamp(fm.a * (1 - fm.transmission), 0.0f, 1.0f);
             } else if (fm.a < 0.99f) {
                 mat.finish = Finish::Glass;
                 mat.tinted = true;
@@ -308,6 +323,14 @@ bool Parse(const std::string& text, Model* model, std::string* error, const std:
                 m.opacity = static_cast<float>(num("opacity", 0.2));
                 m.rough = static_cast<float>(num("rough", 0.05));
                 if (m.opacity < 0 || m.opacity > 1) return fail("glass: opacity from 0 to 1");
+                std::string given;
+                if (value("ior", &given) || value("reflect", &given)) {        // refracting glass
+                    m.refracts = m.tinted = true;
+                    m.ior = static_cast<float>(num("ior", 1.5));
+                    m.reflect = static_cast<float>(num("reflect", 1));
+                    if (m.ior < 1 || m.ior > 3) return fail("glass: ior from 1 to 3");
+                    if (m.reflect < 0 || m.reflect > 1) return fail("glass: reflect from 0 to 1");
+                }
                 model->materials.push_back(m);
                 continue;
             }
@@ -324,6 +347,11 @@ bool Parse(const std::string& text, Model* model, std::string* error, const std:
             m.rough = static_cast<float>(num("rough", m.finish == Finish::Metal ? 0.25 : 0.5));
             m.bright = static_cast<float>(num("bright", 5));
             model->materials.push_back(m);
+            continue;
+        }
+        if (w[0] == "ball") {                           // ball hidden
+            if (w.size() != 2 || w[1] != "hidden") return fail("ball hidden");
+            model->hideBall = true;
             continue;
         }
         if (w[0] == "tempo") {
@@ -709,6 +737,34 @@ Obj ImageTexture(const std::wstring& file) {
     return texture;
 }
 
+// [Glass] Refraction for an index of refraction: the example instance's -0.14 (MI_EP_GlassExample01d) stands for
+// ordinary glass (IOR 1.5). Measured with live reflections: -0.13 to -0.7 look nearly the same, the capture does the
+// work, so the example's scale is kept.
+constexpr float kRefractionPerIor = -0.28f;
+// What refracting glass reflects until a live capture feeds it (the Customize page's ball, a replay): the HDRI
+// Backdrop plugin's sky the game ships, instead of the example's street photo (measured: it read as a street inside
+// the ball).
+const wchar_t* kGlassSkyCube = L"/HDRIBackdrop/Textures/approaching_storm_4k.approaching_storm_4k";
+
+// Refracting glass materials made so far (for the glassset test command, which tunes them live).
+std::vector<eng::Weak> gRefracting;
+std::wstring gRefractingParent;         // tests only (glassparent): another base material for refracting glass
+
+// A texture parameter of a material instance set to a game or engine texture asset; false if it doesn't load.
+bool texture(Obj mid, const char* parameter, const wchar_t* asset) {
+    Obj tex = cosmetics::LoadAsset(asset);
+    if (!mid || !tex) return false;
+    const std::wstring wide = eng::Widen(parameter);
+    const Params named = eng::Call(Lib("KismetStringLibrary"), "Conv_StringToName",
+                                   eng::FString{wide.c_str(), static_cast<int32_t>(wide.size() + 1), static_cast<int32_t>(wide.size() + 1)});
+    const uint8_t* name = named.Return();
+    if (!name) return false;
+    Params p(eng::FunctionOn(mid, "SetTextureParameterValue"));
+    p.Set("ParameterName", name, 8);
+    p.Set("Value", tex);
+    return eng::Invoke(mid, p);
+}
+
 Obj MakeMaterial(const Material& m, Obj worldContext) {
     if (m.finish == Finish::Image) {
         Obj material = cosmetics::ImageMaterial(ImageTexture(m.image), "ModelImage");
@@ -716,7 +772,8 @@ Obj MakeMaterial(const Material& m, Obj worldContext) {
         return material;
     }
     const wchar_t* path = m.finish == Finish::Glow    ? kGlowMaterial
-                          : m.finish == Finish::Glass ? (m.tinted ? kTintedGlassMaterial : kClearGlassMaterial)
+                          : m.finish == Finish::Glass ? (m.refracts ? (gRefractingParent.empty() ? kRefractingGlassMaterial : gRefractingParent.c_str())
+                                                         : m.tinted ? kTintedGlassMaterial : kClearGlassMaterial)
                                                       : kColourMaterial;
     Obj parent = cosmetics::LoadAsset(path);
     if (!parent) return nullptr;
@@ -744,7 +801,28 @@ Obj MakeMaterial(const Material& m, Obj worldContext) {
         p.Set("Value", v);
         eng::Invoke(mid, p);
     };
-    if (m.finish == Finish::Glass) {
+    if (m.finish == Finish::Glass && m.refracts) {
+        scalar("[Glass] Refraction", kRefractionPerIor * (m.ior - 1));
+        vector("[Glass] Translucent Color", m.r, m.g, m.b);
+        vector("[Glass] Reflective color", m.reflect, m.reflect, m.reflect);
+        scalar("[Specular] Value", m.reflect);
+        scalar("[Roughness] Value", m.rough);
+        scalar("[Opacity] Value", m.opacity);
+        scalar("[Glass] Chromatic Aberration", 0);
+        // The example instance's plaster normal map frosts the glass and its base colour texture greys it (measured):
+        // a flat normal and plain white instead.
+        // The engine's Starter Content glass and the game's M_Glass name theirs plainly (read from the packages);
+        // a material ignores parameters it doesn't have.
+        vector("ColorGlass", m.r, m.g, m.b);
+        scalar("Opacity", m.opacity);
+        scalar("Refraction", m.ior);
+        scalar("Roughness", m.rough);
+        scalar("Specular", m.reflect);
+        texture(mid, "Normal Map", L"/Engine/EngineMaterials/FlatNormal.FlatNormal");
+        texture(mid, "Base Color", L"/Engine/EngineResources/WhiteSquareTexture.WhiteSquareTexture");
+        texture(mid, "Fake Cubemap", kGlassSkyCube);
+        gRefracting.push_back(eng::MakeWeak(mid));
+    } else if (m.finish == Finish::Glass) {
         vector("ColorGlass", m.r, m.g, m.b);
         scalar("Opacity", m.opacity);
         if (m.tinted) {
@@ -1261,6 +1339,292 @@ bool SetOpacity(Obj mid, float opacity) {
     p.Set("ParameterName", opacityName, 8);
     p.Set("Value", opacity);
     return eng::Invoke(mid, p);
+}
+
+void SetRefractingGlassParent(const std::string& path) { gRefractingParent = eng::Widen(path); }
+
+// --- live reflections ----------------------------------------------------------------------------------------------------
+// While refracting glass is worn, a cube scene capture follows the played ball and renders its surroundings (the ball
+// and the meshes on it hidden) into a cube render target, 10 times a second, which the glass takes as its
+// "Fake Cubemap": what it shows through it and on it is then the real track. Measured on an RTX 4070 Ti at 256 px:
+// 161 fps without, 147-151 with (about 0.6 ms a frame); one capture serves every glass part. No glass, no capture.
+// The engine has no Blueprint function that makes a cube render target, so one is spawned (GameplayStatics.SpawnObject)
+// and given its GPU resource by UTexture::UpdateResource, a virtual function at vtable +0x318: read from the machine
+// code of CanvasRenderTarget2D.UpdateResource's native entry (mov rax,[rcx]; jmp [rax+0x318]) on this build.
+constexpr size_t kUpdateResourceSlot = 0x318;
+bool gProbeAllowed = true;              // the glassprobe test command can turn it off (to measure what it costs)
+double gProbeInterval = 0;              // seconds between captures (0: every frame; 0.1 felt laggy at speed)
+int32_t gProbeSize = 256;               // pixels per cube face
+bool gProbeLean = true;                 // the capture skips what a small curved reflection doesn't show (below)
+bool gProbeLead = true;                 // captures where the ball will be halfway to the next capture
+
+// What the capture leaves out (engine show flags, by name; unknown names are ignored): shadows, reflections of
+// reflections, fog, particles, decals and lens effects, and far and fine detail. Lighting stays: without global
+// illumination and the reflection environment the capture came out flat and dull (measured, side by side).
+const wchar_t* const kLeanFlags[] = {L"DynamicShadows", L"ContactShadows", L"CapsuleShadows", L"LumenReflections",
+                                     L"ScreenSpaceReflections", L"Fog", L"VolumetricFog", L"Particles", L"Decals",
+                                     L"MotionBlur", L"DepthOfField", L"LensFlares", L"Bloom"};
+constexpr float kLeanViewDistance = 30000;   // cm
+constexpr float kLeanLodFactor = 3;
+
+void MakeLean(Obj capture) {
+    struct Flag {
+        eng::FString name;
+        uint8_t enabled;
+        uint8_t pad[7];
+    };
+    std::vector<std::wstring> names;                     // the engine copies them during the call
+    std::vector<Flag> flags;
+    for (const wchar_t* n : kLeanFlags) names.emplace_back(n);
+    for (const auto& n : names)
+        if (flags.size() < std::size(kLeanFlags))
+            flags.push_back({eng::FString{n.c_str(), static_cast<int32_t>(n.size() + 1), static_cast<int32_t>(n.size() + 1)}, 0, {}});
+    struct {
+        Flag* data;
+        int32_t num, max;
+    } array{flags.data(), static_cast<int32_t>(flags.size()), static_cast<int32_t>(flags.size())};
+    Params p(eng::FunctionOn(capture, "SetShowFlagSettings"));
+    p.Set("InShowFlagSettings", &array, sizeof array);       // the engine copies the array
+    eng::Invoke(capture, p);
+    const float distance = kLeanViewDistance, lod = kLeanLodFactor;
+    eng::WriteBytes(capture, "MaxViewDistanceOverride", &distance, sizeof distance);
+    eng::WriteBytes(capture, "LODDistanceFactor", &lod, sizeof lod);
+}
+double gNextProbeCheck = 0;
+bool gBallWearsGlass = false;           // what the last ScanBall said
+eng::Weak gProbeActor, gProbeTarget;
+int gProbeGeneration = -1;
+double gNextCapture = 0, gNextHide = 0;
+size_t gProbeFed = 0;                   // gRefracting entries given the probe's texture so far
+
+Obj SpawnActorOf(Obj cls, Obj worldContext) {
+    const double zero[3] = {0, 0, 0}, one[3] = {1, 1, 1};
+    Transform t = MakeTransform(zero, zero, one);
+    Obj statics = Lib("GameplayStatics");
+    Params begin(eng::FunctionOn(statics, "BeginDeferredActorSpawnFromClass"));
+    begin.Set("WorldContextObject", worldContext);
+    begin.Set("ActorClass", cls);
+    begin.Set("SpawnTransform", t);
+    begin.Set("CollisionHandlingOverride", uint8_t{1});
+    begin.Set("TransformScaleMethod", uint8_t{1});
+    eng::Invoke(statics, begin);
+    Obj actor = begin.ReturnObj();
+    if (!actor) return nullptr;
+    Params finish(eng::FunctionOn(statics, "FinishSpawningActor"));
+    finish.Set("Actor", actor);
+    finish.Set("SpawnTransform", t);
+    finish.Set("TransformScaleMethod", uint8_t{1});
+    eng::Invoke(statics, finish);
+    return actor;
+}
+
+Obj MakeProbe() {
+    Obj controller = game::PlayerController();
+    Obj targetClass = eng::FindClass("TextureRenderTargetCube"), captureClass = eng::FindClass("SceneCaptureCube");
+    if (!controller || !targetClass || !captureClass) return nullptr;
+    Obj target = eng::Call(Lib("GameplayStatics"), "SpawnObject", targetClass, controller).ReturnObj();
+    if (!target) return nullptr;
+    const int32_t size = gProbeSize;
+    eng::WriteBytes(target, "SizeX", &size, sizeof size);
+    eng::WriteBool(target, "bHDR", true);
+    void** table = *reinterpret_cast<void***>(target);
+    void* update = *reinterpret_cast<void**>(reinterpret_cast<uint8_t*>(table) + kUpdateResourceSlot);
+    if (!eng::InImage(update)) {
+        hostlog::Warn("glass probe: UpdateResource is not where it was measured; no live reflections");
+        return nullptr;
+    }
+    reinterpret_cast<void (*)(Obj)>(update)(target);
+    Obj actor = SpawnActorOf(captureClass, controller);
+    Obj capture = actor ? eng::ReadObj(actor, "CaptureComponentCube") : nullptr;
+    if (!capture) return nullptr;
+    eng::WriteBytes(capture, "TextureTarget", &target, sizeof target);
+    eng::WriteBool(capture, "bCaptureEveryFrame", false);
+    eng::WriteBool(capture, "bCaptureOnMovement", false);
+    if (gProbeLean) MakeLean(capture);
+    gProbeTarget = eng::MakeWeak(target);
+    hostlog::Info("glass probe: cube capture made (" + eng::PathOf(actor) + ")");
+    return actor;
+}
+
+// The meshes built on the played ball (DynamicMeshActors within 3 m of it): whether one wears refracting glass, and,
+// given a capture, hidden from it with the ball (they would fill it from inside). Every second. The glass's materials
+// outlive the ball wearing them (the Customize page keeps its tiles' models), so "worn" is read from the meshes.
+bool ScanBall(Obj capture, Obj ball) {
+    if (capture) {
+        eng::Call(capture, "ClearHiddenComponents");
+        if (ball) eng::Call(capture, "HideActorComponents", ball, uint8_t{1});
+    }
+    static Obj meshClass = nullptr;
+    if (!meshClass) meshClass = eng::FindClass("DynamicMeshActor");
+    double bx = 0, by = 0, bz = 0;
+    if (!meshClass || !race::BallPosition(&bx, &by, &bz)) return false;
+    std::vector<Obj> glass;
+    for (const auto& weak : gRefracting)
+        if (Obj mid = eng::Get(weak)) glass.push_back(mid);
+    bool wears = false;
+    eng::ForEachObject([&](Obj o) {
+        if (eng::ClassOf(o) != meshClass || eng::IsDefaultObject(o)) return true;
+        const Vec3 at = eng::Call(o, "K2_GetActorLocation").ReturnAs<Vec3>();
+        if (std::abs(at.x - bx) >= 300 || std::abs(at.y - by) >= 300 || std::abs(at.z - bz) >= 300) return true;
+        if (capture) eng::Call(capture, "HideActorComponents", o, uint8_t{1});
+        if (Obj mesh = eng::ReadObj(o, "DynamicMeshComponent"); mesh && !wears) {
+            const int32_t count = eng::Call(mesh, "GetNumMaterials").ReturnAs<int32_t>();
+            for (int32_t i = 0; i < count && !wears; ++i) {
+                Obj used = eng::Call(mesh, "GetMaterial", i).ReturnObj();
+                wears = std::find(glass.begin(), glass.end(), used) != glass.end();
+            }
+        }
+        return true;
+    });
+    return wears;
+}
+
+void FeedProbe(Obj target) {
+    const std::wstring wide = L"Fake Cubemap";
+    const Params named = eng::Call(Lib("KismetStringLibrary"), "Conv_StringToName",
+                                   eng::FString{wide.c_str(), static_cast<int32_t>(wide.size() + 1), static_cast<int32_t>(wide.size() + 1)});
+    const uint8_t* n = named.Return();
+    for (; gProbeFed < gRefracting.size(); ++gProbeFed)
+        if (Obj mid = eng::Get(gRefracting[gProbeFed]); mid && n) {
+            Params p(eng::FunctionOn(mid, "SetTextureParameterValue"));
+            p.Set("ParameterName", n, 8);
+            p.Set("Value", target);
+            eng::Invoke(mid, p);
+        }
+}
+
+void SetGlassProbe(bool on) {
+    gProbeAllowed = on;
+    gProbeFed = 0;
+}
+
+void DropProbe();
+
+void TuneGlassProbeLook(bool lean, bool lead) {
+    gProbeLean = lean;
+    gProbeLead = lead;
+    DropProbe();                                         // remade with the new settings
+}
+
+void TuneGlassProbe(double interval, int size) {
+    gProbeInterval = interval;
+    if (size > 0 && size != gProbeSize) {
+        gProbeSize = size;
+        DropProbe();                                     // remade at the new size
+    }
+}
+
+bool AnyRefractingGlass() {
+    for (const auto& weak : gRefracting)
+        if (eng::Get(weak)) return true;
+    return false;
+}
+
+void DropProbe() {
+    if (Obj actor = eng::Get(gProbeActor)) eng::Call(actor, "K2_DestroyActor");
+    gProbeActor = {};
+    gProbeTarget = {};
+    gProbeFed = 0;
+}
+
+void ProbeFrame() {
+    if (gProbeGeneration != game::Generation()) {        // a new map: the old capture went with it
+        gProbeGeneration = game::Generation();
+        gProbeActor = {};
+        gProbeTarget = {};
+        gProbeFed = 0;
+        gBallWearsGlass = false;
+        gNextProbeCheck = 0;
+    }
+    static bool failed = false;
+    if (!gProbeAllowed || failed || !AnyRefractingGlass()) {
+        if (eng::Get(gProbeActor)) DropProbe();
+        return;
+    }
+    Obj ball = race::PlayedBallActor();
+    if (!ball) {
+        if (eng::Get(gProbeActor)) DropProbe();
+        return;
+    }
+    const double now = game::Seconds();
+    Obj actor = eng::Get(gProbeActor);
+    if (now >= gNextProbeCheck) {                        // the ball's meshes: glass worn? (and hide them from it)
+        gNextProbeCheck = now + 1;
+        gNextHide = now + 1;
+        Obj capture = actor ? eng::ReadObj(actor, "CaptureComponentCube") : nullptr;
+        gBallWearsGlass = ScanBall(capture, ball);
+        if (!gBallWearsGlass && actor) DropProbe();
+    }
+    if (!gBallWearsGlass) return;
+    actor = eng::Get(gProbeActor);
+    if (!actor) {
+        actor = MakeProbe();
+        if (!actor) {
+            failed = true;                               // logged in MakeProbe; the glass keeps its sky
+            return;
+        }
+        gProbeActor = eng::MakeWeak(actor);
+        gNextHide = 0;
+    }
+    if (!actor) return;
+    Obj capture = eng::ReadObj(actor, "CaptureComponentCube");
+    Obj target = eng::Get(gProbeTarget);
+    if (!capture || !target) return;
+    if (gNextHide == 0) {                               // just made: hide the ball and its meshes from it
+        gNextHide = now + 1;
+        ScanBall(capture, ball);
+    }
+    FeedProbe(target);
+    if (now < gNextCapture) return;
+    gNextCapture = now + gProbeInterval;
+    double x = 0, y = 0, z = 0;
+    race::BallPosition(&x, &y, &z);
+    if (gProbeLead) {
+        // Shown until the next capture, so taken where the ball will be halfway there (and a frame ahead).
+        const Vec3 v = eng::Call(ball, "GetVelocity").ReturnAs<Vec3>();
+        const double ahead = gProbeInterval / 2 + 1.0 / 60;
+        x += v.x * ahead, y += v.y * ahead, z += v.z * ahead;
+    }
+    Params move(eng::FunctionOn(actor, "K2_SetActorLocation"));
+    move.Set("NewLocation", Vec3{x, y, z});
+    move.Set("bSweep", uint8_t{0});
+    move.Set("bTeleport", uint8_t{1});
+    eng::Invoke(actor, move);
+    eng::Call(capture, "CaptureScene");
+}
+
+
+int TuneRefractingGlassTexture(const std::string& parameter, const std::string& asset) {
+    int tuned = 0;
+    for (const auto& weak : gRefracting)
+        if (Obj mid = eng::Get(weak)) tuned += texture(mid, parameter.c_str(), eng::Widen(asset).c_str()) ? 1 : 0;
+    return tuned;
+}
+
+int TuneRefractingGlass(const std::string& parameter, const std::vector<float>& values) {
+    const std::wstring wide = eng::Widen(parameter);
+    const Params named = eng::Call(Lib("KismetStringLibrary"), "Conv_StringToName",
+                                   eng::FString{wide.c_str(), static_cast<int32_t>(wide.size() + 1), static_cast<int32_t>(wide.size() + 1)});
+    const uint8_t* name = named.Return();
+    if (!name || values.empty()) return 0;
+    int tuned = 0;
+    for (const auto& weak : gRefracting)
+        if (Obj mid = eng::Get(weak)) {
+            if (values.size() == 1) {
+                Params p(eng::FunctionOn(mid, "SetScalarParameterValue"));
+                p.Set("ParameterName", name, 8);
+                p.Set("Value", values[0]);
+                tuned += eng::Invoke(mid, p) ? 1 : 0;
+            } else {
+                const float v[4] = {values[0], values.size() > 1 ? values[1] : 0, values.size() > 2 ? values[2] : 0,
+                                    values.size() > 3 ? values[3] : 1};
+                Params p(eng::FunctionOn(mid, "SetVectorParameterValue"));
+                p.Set("ParameterName", name, 8);
+                p.Set("Value", v);
+                tuned += eng::Invoke(mid, p) ? 1 : 0;
+            }
+        }
+    return tuned;
 }
 
 Obj SpawnMesh(const Colour& colour) {

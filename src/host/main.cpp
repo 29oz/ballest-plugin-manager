@@ -15,6 +15,7 @@
 #include "workshop.hpp"
 #include "hub.hpp"
 #include "cosmetics.hpp"
+#include "models.hpp"
 #include "editor.hpp"
 #include "engine.hpp"
 #include "game.hpp"
@@ -112,6 +113,7 @@ void HostFrame(float dt) {
     hud::Frame();
     replay::Frame(dt);
     cosmetics::Frame();
+    models::ProbeFrame();
     leaderboard::Frame();
     ui::Frame();
     registry::Frame();              // installs and removals land between frames of plugin code

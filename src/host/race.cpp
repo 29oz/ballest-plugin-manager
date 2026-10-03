@@ -605,6 +605,8 @@ bool MoveBall(double x, double y, double z) {
     return eng::Invoke(ball, p);
 }
 
+Obj PlayedBallActor() { return PlayedBall(); }
+
 bool BallPosition(double* x, double* y, double* z) {
     Obj ball = PlayedBall();
     if (!ball) return false;

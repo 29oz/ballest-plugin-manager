@@ -51,6 +51,11 @@ struct Material {
     float rough = 0.5f, bright = 5;
     float opacity = 0.2f;               // glass
     bool tinted = false;                // glass: given a colour
+    // Refracting glass (a glTF material with transmission, or "ior=" in a model file): bends what is behind it by its
+    // index of refraction and reflects its surroundings, as Blender's glass does.
+    bool refracts = false;
+    float ior = 1.5f;                   // index of refraction: 1 is air (no bending), glass about 1.45-1.5, diamond 2.4
+    float reflect = 1;                  // how strongly it reflects, 0 to 1
 };
 
 enum class Shape { Sphere, Box, Cylinder, Cone, Capsule, Disc, Ring, Saw, Cup, Bowl, Spiral, Mesh };
@@ -101,6 +106,7 @@ struct Model {
     std::vector<Material> materials;
     std::vector<Group> groups;
     Tempo tempo;
+    bool hideBall = false;              // "ball hidden": a clear ball's own glass isn't drawn (the model is the ball)
 };
 
 // False with the line and reason in `error` if the text is not a model. Mesh files named in it are found in `folder`
@@ -153,5 +159,14 @@ eng::Obj GlowMaterial(eng::Obj actor);
 eng::Obj NewGlowMaterial(float r, float g, float b, float bright);     // a new dynamic glow material of that colour
 bool SetGlow(eng::Obj material, float r, float g, float b, float bright);
 bool SetOpacity(eng::Obj material, float opacity);
+// Tests only: sets a parameter (one value: scalar; 3-4: a colour) on every refracting glass material made so far, to
+// tune how glass draws. The number of materials changed.
+int TuneRefractingGlass(const std::string& parameter, const std::vector<float>& values);
+int TuneRefractingGlassTexture(const std::string& parameter, const std::string& asset);   // tests only: a texture
+void SetRefractingGlassParent(const std::string& path);
+void SetGlassProbe(bool on);
+void TuneGlassProbe(double interval, int size);
+void TuneGlassProbeLook(bool lean, bool lead);     // tests only: lean capture, capture ahead of the ball   // tests only: seconds between captures (0 every frame), face pixels    // tests only: allow live reflections (on by default) or not, to measure their cost
+void ProbeFrame();              // every frame   // tests only: refracting glass made from now on uses it ("" back)
 
 }  // namespace models

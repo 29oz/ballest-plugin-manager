@@ -10,6 +10,8 @@
 #pragma once
 #include <string>
 
+#include "engine.hpp"
+
 namespace race {
 
 void Frame();                   // after game::Frame
@@ -26,6 +28,7 @@ int CurrentCheckpoint();        // the one a respawn goes to (its bCurrent), or 
 bool MoveBall(double x, double y, double z);    // tests only: teleports the ball being played
 bool CheckpointTrigger(int index, double* x, double* y, double* z);    // tests only: where a strip's trigger is
 bool BallPosition(double* x, double* y, double* z);     // the ball being played (also in the editor's test runs)
+eng::Obj PlayedBallActor();                             // that ball's actor, or null
 bool EditorTesting();           // in the track editor, a test run is on (the camera is on the ball)
 int RunId();                    // the ball's RaceId: a new value for every new run, the same through respawns; -1 off track
 bool Complete();                // the run has been finished (the controller's bRaceComplete)

@@ -21,6 +21,7 @@
 #include "input.hpp"
 #include "log.hpp"
 #include "editor.hpp"
+#include "models.hpp"
 #include "plugins.hpp"
 #include "registry.hpp"
 #include "replay.hpp"
@@ -558,6 +559,39 @@ void Run(const std::string& cmd) {
                  line += hostlog::Hex(off) + "=" + hostlog::Hex(v) + (eng::InImage(reinterpret_cast<void*>(v)) ? "* " : " ");
              }
              Report("fnbytes " + Arg(a, 2) + " base " + hostlog::Hex(eng::Base()) + ": " + line);
+         }},
+        {"glasslook", [](const Args& a, const std::string& c) {     // glasslook <lean 0|1> <lead 0|1>
+             models::TuneGlassProbeLook(Arg(a, 1) != "0", Arg(a, 2) != "0");
+             Report(c + " -> ok");
+         }},
+        {"glassrate", [](const Args& a, const std::string& c) {     // glassrate <seconds between captures> [face pixels]
+             models::TuneGlassProbe(std::atof(Arg(a, 1).c_str()), std::atoi(Arg(a, 2).c_str()));
+             Report(c + " -> ok");
+         }},
+        {"glassprobe", [](const Args& a, const std::string& c) {    // glassprobe on|off: allow live reflections (default on)
+             models::SetGlassProbe(Arg(a, 1) == "on");
+             Report(c + " -> ok");
+         }},
+        {"glassparent", [](const Args& a, const std::string& c) {   // glassparent <material path>|default: then re-wear the ball
+             models::SetRefractingGlassParent(Arg(a, 1) == "default" ? "" : Arg(a, 1));
+             Report(c + " -> ok");
+         }},
+        {"glasstex", [](const Args& a, const std::string& c) {    // glasstex <asset path> <parameter...>: live glass texture
+             std::string name;
+             for (size_t i = 2; i < a.size(); ++i) name += (name.empty() ? "" : " ") + a[i];
+             Report(c + " -> " + std::to_string(models::TuneRefractingGlassTexture(name, Arg(a, 1))) + " material(s)");
+         }},
+        {"glassset", [](const Args& a, const std::string& c) {    // glassset <parameter> <value> [g b a]: live refracting glass
+             // The parameter name can hold spaces ("[Glass] Refraction"): everything before the first number.
+             std::string name;
+             std::vector<float> values;
+             for (size_t i = 1; i < a.size(); ++i) {
+                 char* end = nullptr;
+                 const float v = std::strtof(a[i].c_str(), &end);
+                 if (end && *end == 0 && !a[i].empty()) values.push_back(v);
+                 else name += (name.empty() ? "" : " ") + a[i];
+             }
+             Report(c + " -> " + std::to_string(models::TuneRefractingGlass(name, values)) + " material(s)");
          }},
         {"matparams", [](const Args& a, const std::string&) {    // matparams <material>: its parameter names and values
              eng::Obj m = cosmetics::LoadAsset(eng::Widen(Arg(a, 1)));

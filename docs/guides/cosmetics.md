@@ -60,8 +60,9 @@ line, or `# `, starts a comment. Lengths are in cm and the ball's radius is 50. 
 
 ```
 material <name> plastic|metal|glow #rrggbb [rough=0.5] [bright=5]
-material <name> glass [#rrggbb] [opacity=0.2]
+material <name> glass [#rrggbb] [opacity=0.2] [ior=1.5] [reflect=1] [rough=0.05]
 tempo [rate=1] [run=0] [max=] [calm=1] [full=1]
+ball hidden
 group <name> [spin=x|y|z] [speed=<degrees a second>] [travel] [on=<group>] [pivot=x,y,z]
       [swing=x|y|z angle=<degrees>] [bob=<cm>] [phase=<degrees>]
 <shape> <material> <sizes> [at=x,y,z] [rot=pitch,yaw,roll] [scale=x,y,z]
@@ -86,6 +87,14 @@ group <name> [spin=x|y|z] [speed=<degrees a second>] [travel] [on=<group>] [pivo
   `opacity` from 0 (invisible) to 1. Clear and tinted glass both show in front of the stadium water (host 0.14.0
   and newer: the host moves the game's tinted glass into the water's drawing pass). Colours show as given: the
   game's own rim tint and concrete grain are turned off.
+- **Refracting glass** (host 0.23.2 and newer): give a `glass` material an `ior` (index of refraction: 1 is air and
+  doesn't bend, glass is about 1.45-1.5, diamond 2.4) or a `reflect` (0 to 1, how strongly it reflects) and it
+  becomes real glass. It bends what is behind it, like a solid glass ball, and reflects its surroundings: while the
+  ball wears it, the host keeps a live 360-degree picture of the track around the ball (every frame, simplified: no
+  shadows or fog, nothing past 300 m; about 3 ms a frame on an RTX 4070 Ti, shared by all the glass on the ball). On the Customize page, with no track around
+  it, it reflects a sky. `opacity` 0 is as clear as glass gets; higher values cloud it.
+- **`ball hidden`** (host 0.23.2 and newer): for a ball with no image, the game's own clear ball isn't drawn, for a
+  model that is the whole ball, such as a glass sphere around it (it would show as a second ball inside).
 - **Groups** collect the parts after them. `spin` turns the group about an axis; `travel` keeps it level and turned
   the way the ball is going instead of rolling with the ball (a blade that stays upright, for example). Before the
   ball has moved, a travelling group faces away from the camera, and on the Customize page it faces the camera.
@@ -157,6 +166,10 @@ mesh <file> [size=<cm>] [at=x,y,z] [rot=pitch,yaw,roll] [scale=x,y,z] [material=
 - Its **colours** come from the file: a base colour (plastic, or metal when metallic), a base colour texture, an
   emissive colour (glows), or an alpha below 1 (tinted glass). `material=` uses one of the text file's materials
   for all of it instead.
+- **Glass** from Blender works as it does there (host 0.23.2 and newer): a Principled BSDF with **Transmission**
+  above 0 becomes [refracting glass](#models), bending what is behind it by its **IOR** and reflecting the real track
+  around the ball. Its base colour tints it, its roughness and specular are kept, and the more it transmits, the
+  clearer it is. Blender's glTF exporter writes all of this (KHR_materials_transmission and _ior) without any option.
 - `anim` plays one of the file's animations (its name, or part of it): `rate` times its own speed while the ball is
   still, plus `run` more for every m/s of the ball's speed. `idle` plays another animation while the ball is still
   (below 0.5 m/s). Each is baked into `frames` poses when the plugin loads (skinned characters too).

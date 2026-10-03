@@ -383,6 +383,13 @@ private:
                 mat.eg = static_cast<float>(e->items[1].number * strength);
                 mat.eb = static_cast<float>(e->items[2].number * strength);
             }
+            if (const json::Value* ext = m.Get("extensions")) {
+                if (const json::Value* t = ext->Get("KHR_materials_transmission"))
+                    mat.transmission = static_cast<float>(Num(t->Get("transmissionFactor"), 0));
+                if (const json::Value* i = ext->Get("KHR_materials_ior")) mat.ior = static_cast<float>(Num(i->Get("ior"), 1.5));
+                if (const json::Value* s = ext->Get("KHR_materials_specular"))
+                    mat.specular = static_cast<float>(Num(s->Get("specularFactor"), 1));
+            }
             if (m.Str("alphaMode") != "BLEND") mat.a = 1;
             materials_.push_back(mat);
         }
